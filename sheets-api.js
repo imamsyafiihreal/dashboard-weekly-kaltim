@@ -151,7 +151,7 @@ function fetchSheetRowsGViz(spreadsheetId, sheetName) {
  * Parsing data Sheet REKAPITULASI
  */
 function parseRekapRows(data) {
-  var inKaltimSection = false;
+  var inKaltimSection = true; // Baris paling atas sheet REKAPITULASI adalah Kalimantan Timur
   var kabList = [];
   var kabMap = {};
   var provTotal = null;
@@ -173,25 +173,23 @@ function parseRekapRows(data) {
     var upper0 = c0.toUpperCase();
     var upper1 = c1.toUpperCase();
 
-    if (upper0.indexOf('KALIMANTAN TIMUR') !== -1 || upper1.indexOf('KALIMANTAN TIMUR') !== -1) {
-      inKaltimSection = true;
-      continue;
-    }
-
-    if (inKaltimSection && (
-      upper0.indexOf('PROVINSI KALIMANTAN UTARA') !== -1 ||
-      upper0.indexOf('PROVINSI KALIMANTAN SELATAN') !== -1 ||
-      upper0.indexOf('PROVINSI KALIMANTAN TENGAH') !== -1 ||
-      upper0.indexOf('PROVINSI KALIMANTAN BARAT') !== -1 ||
-      upper1.indexOf('PROVINSI KALIMANTAN UTARA') !== -1 ||
-      upper1.indexOf('PROVINSI KALIMANTAN SELATAN') !== -1
-    )) {
+    // Berhenti jika sudah masuk ke blok provinsi lain di bawah Kalimantan Timur
+    if (upper0.indexOf('KALIMANTAN UTARA') !== -1 ||
+        upper0.indexOf('KALIMANTAN SELATAN') !== -1 ||
+        upper0.indexOf('KALIMANTAN TENGAH') !== -1 ||
+        upper0.indexOf('KALIMANTAN BARAT') !== -1 ||
+        upper1.indexOf('KALIMANTAN UTARA') !== -1 ||
+        upper1.indexOf('KALIMANTAN SELATAN') !== -1 ||
+        upper1.indexOf('KALIMANTAN TENGAH') !== -1 ||
+        upper1.indexOf('KALIMANTAN BARAT') !== -1) {
       break;
     }
 
-    if (!inKaltimSection) continue;
+    // Deteksi baris TOTAL / JUMLAH Provinsi Kaltim (bisa bertuliskan TOTAL atau baris subtotal angka setelah kab/kota)
+    var isTotalRow = (upper0 === 'TOTAL' || upper1 === 'TOTAL' || upper0.indexOf('JUMLAH') === 0 || upper1.indexOf('JUMLAH') === 0) ||
+                     (!c0 && !c1 && toNum(row[2]) > 0 && kabList.length >= 8);
 
-    if (upper0 === 'TOTAL' || upper1 === 'TOTAL' || upper0.indexOf('JUMLAH') === 0 || upper1.indexOf('JUMLAH') === 0) {
+    if (isTotalRow) {
       var pSiswa = toNum(row[2]), pBumil = toNum(row[3]), pBusui = toNum(row[4]), pBalita = toNum(row[5]);
       var pTot = toNum(row[6]) > 0 ? toNum(row[6]) : (pSiswa + pBumil + pBusui + pBalita);
 
@@ -219,10 +217,11 @@ function parseRekapRows(data) {
     }
 
     var candidateName = c1 || c0;
-    if (!candidateName || upper1 === 'NAMA WILAYAH' || upper1.indexOf('NOTE') === 0) continue;
+    if (!candidateName || upper1 === 'NAMA WILAYAH' || upper1.indexOf('NOTE') === 0 || upper0.indexOf('NOTE') === 0) continue;
 
     var kabNorm = normalizeKabName(candidateName);
     if (!KALTIM_COORDS[kabNorm] && isNaN(parseFloat(c0))) continue;
+    if (!KALTIM_COORDS[kabNorm]) continue;
     if (kabMap[kabNorm]) continue;
 
     var coord = KALTIM_COORDS[kabNorm] || [-0.5022, 117.1536];
@@ -248,6 +247,45 @@ function parseRekapRows(data) {
       lng: coord[1],
       potSiswa: potSiswa, potBumil: potBumil, potBusui: potBusui, potBalita: potBalita, potTotal: potTotal,
       targetSppg: targetSppg, sppgBeroperasi: sppgBeroperasi, sppgStop: sppgStop, sppgBelum: sppgBelum, totalSppg: totalSppg,
+      pmBalita: pmBalita, pmBumil: pmBumil, pmBusui: pmBusui, total3B: total3B,
+      pmSiswa: pmSiswa, pmTendik: pmTendik, pmNonTendik: pmNonTendik, totalPm: totalPm,
+      bpjsSudah: toNum(row[23]), slhsSudah: toNum(row[25]), chefSudah: toNum(row[27]), halalSudah: toNum(row[29]),
+      updateTanggal: toStr(row[31])
+    };
+
+    kabList.push(itemObj);
+    kabMap[kabNorm] = itemObj;
+
+    sumFallback.potSiswa += potSiswa;
+    sumFallback.potBumil += potBumil;
+    sumFallback.potBusui += potBusui;
+    sumFallback.potBalita += potBalita;
+    sumFallback.potTotal += potTotal;
+    sumFallback.targetSppg += targetSppg;
+    sumFallback.sppgBeroperasi += sppgBeroperasi;
+    sumFallback.sppgStop += sppgStop;
+    sumFallback.sppgBelum += sppgBelum;
+    sumFallback.totalSppg += totalSppg;
+    sumFallback.pmBalita += pmBalita;
+    sumFallback.pmBumil += pmBumil;
+    sumFallback.pmBusui += pmBusui;
+    sumFallback.total3B += total3B;
+    sumFallback.pmSiswa += pmSiswa;
+    sumFallback.pmTendik += pmTendik;
+    sumFallback.pmNonTendik += pmNonTendik;
+    sumFallback.totalPm += totalPm;
+    sumFallback.bpjsSudah += itemObj.bpjsSudah;
+    sumFallback.slhsSudah += itemObj.slhsSudah;
+    sumFallback.chefSudah += itemObj.chefSudah;
+    sumFallback.halalSudah += itemObj.halalSudah;
+  }
+
+  return {
+    provTotal: provTotal || sumFallback,
+    kabList: kabList,
+    kabMap: kabMap
+  };
+}
       pmBalita: pmBalita, pmBumil: pmBumil, pmBusui: pmBusui, total3B: total3B,
       pmSiswa: pmSiswa, pmTendik: pmTendik, pmNonTendik: pmNonTendik, totalPm: totalPm,
       bpjsSudah: toNum(row[23]), slhsSudah: toNum(row[25]), chefSudah: toNum(row[27]), halalSudah: toNum(row[29]),
