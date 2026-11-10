@@ -4,7 +4,7 @@
  * DASHBOARD PUBLIK MONITORING MBG - PROVINSI KALIMANTAN TIMUR
  * Badan Gizi Nasional (BGN)
  * ============================================================================
- * Modul ini membaca langsung dari Google Spreadsheet menggunakan   Google GViz API.
+ * Modul ini membaca langsung dari Google Spreadsheet menggunakan Google GViz API.
  * Syarat: Google Spreadsheet harus disetel "Anyone with the link can view"
  * (Siapa saja yang memiliki link dapat melihat).
  */
@@ -247,45 +247,6 @@ function parseRekapRows(data) {
       lng: coord[1],
       potSiswa: potSiswa, potBumil: potBumil, potBusui: potBusui, potBalita: potBalita, potTotal: potTotal,
       targetSppg: targetSppg, sppgBeroperasi: sppgBeroperasi, sppgStop: sppgStop, sppgBelum: sppgBelum, totalSppg: totalSppg,
-      pmBalita: pmBalita, pmBumil: pmBumil, pmBusui: pmBusui, total3B: total3B,
-      pmSiswa: pmSiswa, pmTendik: pmTendik, pmNonTendik: pmNonTendik, totalPm: totalPm,
-      bpjsSudah: toNum(row[23]), slhsSudah: toNum(row[25]), chefSudah: toNum(row[27]), halalSudah: toNum(row[29]),
-      updateTanggal: toStr(row[31])
-    };
-
-    kabList.push(itemObj);
-    kabMap[kabNorm] = itemObj;
-
-    sumFallback.potSiswa += potSiswa;
-    sumFallback.potBumil += potBumil;
-    sumFallback.potBusui += potBusui;
-    sumFallback.potBalita += potBalita;
-    sumFallback.potTotal += potTotal;
-    sumFallback.targetSppg += targetSppg;
-    sumFallback.sppgBeroperasi += sppgBeroperasi;
-    sumFallback.sppgStop += sppgStop;
-    sumFallback.sppgBelum += sppgBelum;
-    sumFallback.totalSppg += totalSppg;
-    sumFallback.pmBalita += pmBalita;
-    sumFallback.pmBumil += pmBumil;
-    sumFallback.pmBusui += pmBusui;
-    sumFallback.total3B += total3B;
-    sumFallback.pmSiswa += pmSiswa;
-    sumFallback.pmTendik += pmTendik;
-    sumFallback.pmNonTendik += pmNonTendik;
-    sumFallback.totalPm += totalPm;
-    sumFallback.bpjsSudah += itemObj.bpjsSudah;
-    sumFallback.slhsSudah += itemObj.slhsSudah;
-    sumFallback.chefSudah += itemObj.chefSudah;
-    sumFallback.halalSudah += itemObj.halalSudah;
-  }
-
-  return {
-    provTotal: provTotal || sumFallback,
-    kabList: kabList,
-    kabMap: kabMap
-  };
-}
       pmBalita: pmBalita, pmBumil: pmBumil, pmBusui: pmBusui, total3B: total3B,
       pmSiswa: pmSiswa, pmTendik: pmTendik, pmNonTendik: pmNonTendik, totalPm: totalPm,
       bpjsSudah: toNum(row[23]), slhsSudah: toNum(row[25]), chefSudah: toNum(row[27]), halalSudah: toNum(row[29]),
