@@ -1,0 +1,4 @@
+#071e49 Biru Gelap
+#92d05d Hijau Terang
+#b5e0ea Biru Muda Pastel
+#d1b06c Emas

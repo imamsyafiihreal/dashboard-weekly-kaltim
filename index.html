@@ -1,0 +1,3224 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Publik MBG Kalimantan Timur - Badan Gizi Nasional</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bgn: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              200: '#bfdbfe',
+              500: '#2563eb',
+              600: '#1d4ed8',
+              700: '#1e40af',
+              800: '#1e3a8a',
+              900: '#0a2558',
+              accent: '#0284c7',
+              gold: '#f59e0b'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <!-- Leaflet Geo-Map & Chart.js -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Google Sheets Direct Connector (Tanpa Apps Script) -->
+  <script src="sheets-api.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    #map {
+      height: 380px;
+      width: 100%;
+      border-radius: 0.75rem;
+      z-index: 10;
+      background: #e2e8f0;
+    }
+
+    .kab-pill.active {
+      background-color: #0a2558;
+      color: #ffffff;
+      border-color: #0a2558;
+      box-shadow: 0 4px 10px rgba(10, 37, 88, 0.25);
+    }
+
+    .kab-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: #94a3b8 #e2e8f0;
+    }
+
+    .kab-scrollbar::-webkit-scrollbar {
+      height: 7px;
+    }
+
+    .kab-scrollbar::-webkit-scrollbar-track {
+      background: #e2e8f0;
+      border-radius: 9999px;
+    }
+
+    .kab-scrollbar::-webkit-scrollbar-thumb {
+      background: #94a3b8;
+      border-radius: 9999px;
+    }
+
+    .kab-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #0a2558;
+    }
+
+    .leaflet-tooltip-own {
+      background: rgba(10, 37, 88, 0.92);
+      color: #fff;
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 11px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-fade-up {
+      animation: fadeSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .interactive-card {
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease;
+    }
+
+    .interactive-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px -5px rgba(10, 37, 88, 0.08), 0 4px 6px -2px rgba(10, 37, 88, 0.04);
+    }
+
+    [data-tip] {
+      position: relative;
+      cursor: help;
+    }
+
+    [data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: #0a2558;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 1.35;
+      padding: 5px 9px;
+      border-radius: 6px;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      z-index: 50;
+    }
+
+    [data-tip]:hover::after {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Dynamic Offcanvas Drawer Styles */
+    #sidebarBackdrop {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    #sidebarBackdrop.drawer-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #appSidebar {
+      transform: translateX(-100%);
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.32s ease;
+    }
+
+    #appSidebar.drawer-open {
+      transform: translateX(0);
+      box-shadow: 0 25px 50px -12px rgba(10, 37, 88, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-item-active {
+      background: linear-gradient(90deg, #1d4ed8 0%, #1e40af 100%) !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 14px rgba(29, 78, 216, 0.4);
+      transform: translateX(3px);
+    }
+
+    .nav-btn {
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .nav-btn:hover:not(.nav-item-active) {
+      background-color: rgba(255, 255, 255, 0.08);
+      transform: translateX(2px);
+    }
+
+    .nav-item-active {
+      background: linear-gradient(90deg, #1d4ed8 0%, #1e40af 100%) !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 12px rgba(29, 78, 216, 0.35);
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col overflow-x-hidden w-full max-w-full">
+
+  <!-- 1. HEADER UTAMA RESPONSIF -->
+  <header class="bg-gradient-to-r from-bgn-900 via-bgn-800 to-bgn-700 text-white border-b border-white/10 shadow-md">
+    <div
+      class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex items-center space-x-2 sm:space-x-3 min-w-0">
+        <!-- Tombol Hamburger Menu Navigasi Dinamis -->
+        <button type="button" onclick="toggleSidebar()" id="sidebarToggleBtn"
+          class="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/20 text-white transition-all duration-200 cursor-pointer shrink-0 shadow-xs"
+          title="Buka Menu Navigasi Portal">
+          <svg class="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor"
+            viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+          <span class="hidden sm:inline text-xs font-bold tracking-wide">Menu</span>
+        </button>
+        <div
+          class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 border border-white/30 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
+          <img src="Assets Image/BGN_LOGO.png"
+            alt="Logo Badan Gizi Nasional" class="w-full h-full object-contain"
+            onerror="this.onerror=null; this.src='https://lh3.googleusercontent.com/d/1hQKpIvrOocxkkl0tCCilXE31tV3oWsot';">
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span
+              class="px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-bgn-900 rounded">
+              BADAN GIZI NASIONAL
+            </span>
+            <span class="px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase bg-white/15 text-sky-200 rounded">
+              PORTAL PUBLIK
+            </span>
+            <span id="statusLoadBadge"
+              class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-sky-400/20 text-sky-200 border border-sky-300/30 animate-pulse">
+              Memuat Data...
+            </span>
+          </div>
+          <h1 class="text-xs sm:text-base md:text-lg font-extrabold tracking-tight mt-1 leading-snug">
+            DASHBOARD MONITORING MAKAN BERGIZI GRATIS PROVINSI KALIMANTAN TIMUR
+          </h1>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- APP CONTAINER DENGAN SIDEBAR NAVIGASI (5 HALAMAN) -->
+  <div class="flex-1 flex overflow-hidden w-full relative">
+
+    <!-- BACKDROP GELAP SAAT DRAWER SIDEBAR TERBUKA (DESKTOP & MOBILE) -->
+    <div id="sidebarBackdrop" onclick="closeSidebar()"
+      class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 transition-opacity"></div>
+
+    <!-- SIDEBAR DRAWER DINAMIS (MELUNCUR HALUS DARI KIRI) -->
+    <aside id="appSidebar"
+      class="fixed top-0 bottom-0 left-0 z-50 w-72 sm:w-80 bg-bgn-900/98 backdrop-blur-md text-white flex flex-col justify-between border-r border-white/10 select-none">
+
+      <!-- Bagian Atas Sidebar -->
+      <div class="p-4 space-y-4 overflow-y-auto">
+        <!-- Brand / Header Sidebar Mobile -->
+        <div class="flex items-center justify-between pb-3 border-b border-bgn-800">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-white p-1 flex items-center justify-center shrink-0">
+              <img src="Assets Image/BGN_LOGO.png" alt="Logo BGN"
+                class="w-full h-full object-contain"
+                onerror="this.onerror=null; this.src='https://lh3.googleusercontent.com/d/1hQKpIvrOocxkkl0tCCilXE31tV3oWsot';">
+            </div>
+            <div>
+              <div class="text-[10px] font-extrabold text-amber-400 uppercase tracking-wider">PORTAL BGN</div>
+              <div class="text-xs font-bold text-white">Kalimantan Timur</div>
+            </div>
+          </div>
+          <button type="button" onclick="closeSidebar()"
+            class="lg:hidden text-white/70 hover:text-white p-1 text-xl font-bold cursor-pointer">
+            &times;
+          </button>
+        </div>
+
+        <!-- Menu Navigasi 5 Halaman -->
+        <div>
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-3 mb-2">
+            Menu Utama
+          </div>
+          <nav class="space-y-1">
+            <button type="button" onclick="switchPage('monitoring')" id="nav-monitoring"
+              class="nav-btn nav-item-active w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer text-left">
+              <span class="menu-icon text-base">📊</span>
+              <span class="truncate">Dashboard Monitoring</span>
+            </button>
+
+
+
+            <button type="button" onclick="switchPage('direktori')" id="nav-direktori"
+              class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer text-left">
+              <span class="menu-icon text-base">🏠</span>
+              <span class="truncate">Direktori / Profil SPPG</span>
+            </button>
+
+            <button type="button" onclick="switchPage('sertifikasi')" id="nav-sertifikasi"
+              class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer text-left">
+              <span class="menu-icon text-base">🏅</span>
+              <span class="truncate">Data Sertifikasi SPPG</span>
+            </button>
+
+            <button type="button" onclick="switchPage('informasi')" id="nav-informasi"
+              class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer text-left">
+              <span class="menu-icon text-base">ℹ️</span>
+              <span class="truncate">Informasi &amp; FAQ</span>
+            </button>
+          </nav>
+        </div>
+
+        <!-- Filter Cepat Wilayah dari Sidebar -->
+        <div class="pt-3 border-t border-bgn-800">
+          <div
+            class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-3 mb-2 flex items-center justify-between">
+            <span>Filter Wilayah</span>
+            <span id="sidebarScopeBadge" class="text-[9px] text-amber-400">10 Kab/Kota</span>
+          </div>
+          <div class="px-2">
+            <select id="sidebarKabSelect" onchange="selectKabupaten(this.value, false)"
+              class="w-full text-xs text-white bg-white/10 border border-white/20 rounded-xl px-2.5 py-2 font-semibold focus:outline-none focus:border-amber-400">
+              <option value="SEMUA" class="text-slate-900 font-bold">🌐 Seluruh Kaltim</option>
+              <option value="KOTA BALIKPAPAN" class="text-slate-900">KOTA BALIKPAPAN</option>
+              <option value="KOTA SAMARINDA" class="text-slate-900">KOTA SAMARINDA</option>
+              <option value="KOTA BONTANG" class="text-slate-900">KOTA BONTANG</option>
+              <option value="PASER" class="text-slate-900">PASER</option>
+              <option value="PENAJAM PASER UTARA" class="text-slate-900">PENAJAM PASER UTARA</option>
+              <option value="KUTAI KARTANEGARA" class="text-slate-900">KUTAI KARTANEGARA</option>
+              <option value="KUTAI BARAT" class="text-slate-900">KUTAI BARAT</option>
+              <option value="KUTAI TIMUR" class="text-slate-900">KUTAI TIMUR</option>
+              <option value="BERAU" class="text-slate-900">BERAU</option>
+              <option value="MAHAKAM ULU" class="text-slate-900">MAHAKAM ULU</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bagian Bawah Sidebar (Footer Mini) -->
+      <div class="p-3 border-t border-bgn-800 bg-bgn-950/60 text-[10px] text-slate-400 space-y-1">
+        <div class="flex items-center gap-1.5 text-emerald-400 font-bold">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>BGN Kaltim Terhubung</span>
+        </div>
+        <div>Portal Resmi Publik MBG 2026</div>
+      </div>
+    </aside>
+
+    <!-- AREA KONTEN UTAMA (KANAN) -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+
+      <!-- 2. STICKY BAR: PILIHAN CEPAT 10 KABUPATEN / KOTA KALTIM -->
+      <nav class="bg-white/95 backdrop-blur-md shadow-xs sticky top-0 z-30 border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
+          <div class="flex items-center justify-between gap-2 mb-1.5">
+            <span class="text-[11px] font-extrabold uppercase tracking-wider text-bgn-900">
+              📍 Pilih Wilayah Kabupaten / Kota:
+            </span>
+            <button id="btnResetKab" onclick="selectKabupaten('SEMUA')"
+              class="hidden text-[11px] font-bold text-bgn-600 hover:text-bgn-800 underline cursor-pointer">
+              &larr; Tampilkan Seluruh Kalimantan Timur
+            </button>
+          </div>
+          <div id="kabPillsContainer" class="flex items-center gap-1.5 overflow-x-auto kab-scrollbar pb-1.5">
+            <button onclick="selectKabupaten('SEMUA')" id="pill-SEMUA"
+              class="kab-pill active shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>🌐 Seluruh Kaltim</span>
+            </button>
+            <button onclick="selectKabupaten('KOTA BALIKPAPAN')" id="pill-KOTA BALIKPAPAN"
+              class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>KOTA BALIKPAPAN</span>
+            </button>
+            <button onclick="selectKabupaten('KOTA SAMARINDA')" id="pill-KOTA SAMARINDA"
+              class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>KOTA SAMARINDA</span>
+            </button>
+            <button onclick="selectKabupaten('KOTA BONTANG')" id="pill-KOTA BONTANG"
+              class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>KOTA BONTANG</span>
+            </button>
+            <button onclick="selectKabupaten('PASER')" id="pill-PASER"
+              class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>PASER</span>
+            </button>
+            <button onclick="selectKabupaten('PENAJAM PASER UTARA')" id="pill-PENAJAM PASER UTARA"
+              class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>PENAJAM PASER UTARA</span>
+            </button>
+            <button onclick="selectKabupaten('KUTAI KARTANEGARA')" id="pill-KUTAI KARTANEGARA"
+              class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>KUTAI KARTANEGARA</span>
+            </button>
+            <button onclick="selectKabupaten('KUTAI BARAT')" id="pill-KUTAI BARAT"
+              class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>KUTAI BARAT</span>
+            </button>
+            <button onclick="selectKabupaten('KUTAI TIMUR')" id="pill-KUTAI TIMUR"
+              class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>KUTAI TIMUR</span>
+            </button>
+            <button onclick="selectKabupaten('BERAU')" id="pill-BERAU"
+              class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>BERAU</span>
+            </button>
+            <button onclick="selectKabupaten('MAHAKAM ULU')" id="pill-MAHAKAM ULU"
+              class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">
+              <span>MAHAKAM ULU</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <!-- MAIN WRAPPER 5 HALAMAN -->
+      <main class="max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 space-y-4 sm:space-y-6">
+        <!-- PAGE 1: DASHBOARD MONITORING -->
+        <div id="page-monitoring" class="app-page space-y-4 sm:space-y-6">
+          <div id="regionBanner"
+            class="bg-gradient-to-r from-bgn-900 to-bgn-700 text-white rounded-2xl p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-up">
+            <div>
+              <div class="flex items-center gap-2">
+                <span id="activeScopeBadge"
+                  class="px-2.5 py-0.5 bg-amber-400 text-bgn-900 rounded-full text-[10px] font-extrabold uppercase">
+                  CAKUPAN PROVINSI
+                </span>
+              </div>
+              <h2 id="activeRegionTitle" class="text-xl sm:text-2xl font-extrabold mt-1">
+                PROVINSI KALIMANTAN TIMUR (10 KABUPATEN/KOTA)
+              </h2>
+              <p class="text-xs text-sky-100/90 mt-0.5">
+                Data agregat capaian mengacu langsung pada Rekapitulasi Resmi BGN. Klik wilayah Kabupaten/Kota pada peta
+                atau tombol di atas untuk menelusuri daftar SPPG.
+              </p>
+            </div>
+
+            <!-- Indikator Sertifikasi Wilayah Aktif -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full md:w-auto shrink-0">
+              <div
+                class="cert-box bg-white/10 hover:bg-white/15 border border-white/15 px-3 py-2 rounded-xl text-center transition"
+                data-tip="Perlindungan Jaminan Sosial Ketenagakerjaan Relawan SPPG">
+                <div class="text-[10px] text-sky-200 font-bold uppercase">BPJS TK ⓘ</div>
+                <div id="kpi-cert-bpjs" class="text-sm font-extrabold text-white mt-0.5">-</div>
+              </div>
+              <div
+                class="cert-box bg-white/10 hover:bg-white/15 border border-white/15 px-3 py-2 rounded-xl text-center transition"
+                data-tip="Sertifikat Laik Higiene Sanitasi dari Dinas Kesehatan">
+                <div class="text-[10px] text-sky-200 font-bold uppercase">Sertif SLHS ⓘ</div>
+                <div id="kpi-cert-slhs" class="text-sm font-extrabold text-white mt-0.5">-</div>
+              </div>
+              <div
+                class="cert-box bg-white/10 hover:bg-white/15 border border-white/15 px-3 py-2 rounded-xl text-center transition"
+                data-tip="Sertifikasi Halal Resmi untuk Dapur & Olahan Pangan">
+                <div class="text-[10px] text-sky-200 font-bold uppercase">Sertif Halal ⓘ</div>
+                <div id="kpi-cert-halal" class="text-sm font-extrabold text-white mt-0.5">-</div>
+              </div>
+              <div
+                class="cert-box bg-white/10 hover:bg-white/15 border border-white/15 px-3 py-2 rounded-xl text-center transition"
+                data-tip="Juru Masak Tersertifikasi BNSP Resmi">
+                <div class="text-[10px] text-sky-200 font-bold uppercase">Sertif Chef ⓘ</div>
+                <div id="kpi-cert-chef" class="text-sm font-extrabold text-white mt-0.5">-</div>
+              </div>
+            </div>
+          </div>
+          <!-- 5 KARTU KPI UTAMA (MENGACU KE SHEET REKAPITULASI) -->
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 animate-fade-up">
+            <div
+              class="interactive-card bg-white p-4 rounded-xl border-l-4 border-l-emerald-600 border border-slate-200 shadow-xs">
+              <p class="text-[11px] font-bold text-slate-500 uppercase flex items-center justify-between">
+                <span>SPPG Beroperasi</span>
+                <span class="text-slate-400" data-tip="Unit SPPG yang telah aktif beroperasi melayani">ⓘ</span>
+              </p>
+              <h3 id="kpi-sppg-aktif" class="text-2xl sm:text-3xl font-extrabold text-emerald-700 mt-1">-</h3>
+              <p id="kpi-sppg-target" class="text-[11px] text-slate-500 mt-1">Dari Target: - Unit</p>
+            </div>
+
+            <div
+              class="interactive-card bg-white p-4 rounded-xl border-l-4 border-l-bgn-600 border border-slate-200 shadow-xs">
+              <p class="text-[11px] font-bold text-slate-500 uppercase">Total Penerima Manfaat</p>
+              <h3 id="kpi-total-pm" class="text-2xl sm:text-3xl font-extrabold text-bgn-900 mt-1">-</h3>
+              <p id="kpi-potensi-pm" class="text-[11px] text-slate-500 mt-1">Potensi Sasaran: -</p>
+            </div>
+
+            <div
+              class="interactive-card bg-white p-4 rounded-xl border-l-4 border-l-indigo-600 border border-slate-200 shadow-xs">
+              <p class="text-[11px] font-bold text-slate-500 uppercase">PM Siswa</p>
+              <h3 id="kpi-pm-siswa" class="text-2xl sm:text-3xl font-extrabold text-indigo-700 mt-1">-</h3>
+              <p id="kpi-pm-tendik" class="text-[11px] text-slate-500 mt-1">+ Tendik &amp; Non-Tendik: -</p>
+            </div>
+
+            <div
+              class="interactive-card bg-white p-4 rounded-xl border-l-4 border-l-amber-500 border border-slate-200 shadow-xs">
+              <p class="text-[11px] font-bold text-slate-500 uppercase flex items-center justify-between">
+                <span>Kelompok 3B</span>
+                <span class="text-slate-400" data-tip="Kelompok 3B : Balita, Ibu Hamil, dan Ibu Menyusui">ⓘ</span>
+              </p>
+              <h3 id="kpi-pm-3b" class="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-1">-</h3>
+              <p id="kpi-pm-3b-sub" class="text-[11px] text-slate-500 mt-1">Balita: - | Bumil/Busui: -</p>
+            </div>
+
+            <div
+              class="interactive-card bg-white p-4 rounded-xl border-l-4 border-l-sky-500 border border-slate-200 shadow-xs col-span-2 md:col-span-1">
+              <p class="text-[11px] font-bold text-slate-500 uppercase">Total SPPG Terdata</p>
+              <h3 id="kpi-sppg-total" class="text-2xl sm:text-3xl font-extrabold text-sky-700 mt-1">-</h3>
+              <p id="kpi-sppg-status-sub" class="text-[11px] text-slate-500 mt-1">Persiapan: - | Evaluasi/Stop: -</p>
+            </div>
+          </div>
+          <!-- PANEL FILTER CEKLIS MULTI-STATUS SPPG DI REKAPITULASI UTAMA -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <h3 class="text-xs font-extrabold text-bgn-900 uppercase tracking-wider flex items-center gap-2">
+                  <span>☑️ Filter &amp; Kalkulator Status Operasional SPPG</span>
+                </h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">
+                  Centang satu atau beberapa status di bawah untuk menghitung total gabungan unit SPPG &amp; Penerima
+                  Manfaat secara otomatis:
+                </p>
+              </div>
+
+              <div class="flex items-center gap-2 shrink-0">
+                <button onclick="setAllStatusCheckboxes(true)"
+                  class="px-2.5 py-1 bg-bgn-50 hover:bg-bgn-100 text-bgn-800 border border-blue-200 rounded-lg text-[11px] font-bold transition cursor-pointer">
+                  ✅ Centang Semua
+                </button>
+                <button onclick="setOnlyStopCheckboxes()"
+                  class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold transition cursor-pointer">
+                  ⚠️ Ceklis Semua Suspend &amp; Karhutla
+                </button>
+                <button onclick="setAllStatusCheckboxes(false)"
+                  class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-[11px] font-bold transition cursor-pointer">
+                  ⬜ Kosongkan
+                </button>
+              </div>
+            </div>
+
+            <!-- 4 Kotak Ceklis Status SPPG -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-3">
+              <!-- 1. Beroperasi -->
+              <label
+                class="flex items-center justify-between p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50 cursor-pointer transition select-none">
+                <div class="flex items-center gap-2.5">
+                  <input type="checkbox" value="BEROPERASI" checked onchange="onStatusCheckboxChange(this)"
+                    class="sppg-status-cb w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer">
+                  <div>
+                    <div class="text-xs font-bold text-emerald-900">✅ Beroperasi</div>
+                    <div class="text-[10px] text-emerald-700">Aktif melayani</div>
+                  </div>
+                </div>
+                <span id="cb-count-BEROPERASI"
+                  class="px-2 py-0.5 bg-emerald-600 text-white rounded-full text-xs font-extrabold">0</span>
+              </label>
+
+              <!-- 2. Tahap Persiapan (Belum Ops) -->
+              <label
+                class="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 cursor-pointer transition select-none">
+                <div class="flex items-center gap-2.5">
+                  <input type="checkbox" value="BELUM" checked onchange="onStatusCheckboxChange(this)"
+                    class="sppg-status-cb w-4 h-4 text-slate-700 rounded focus:ring-slate-500 cursor-pointer">
+                  <div>
+                    <div class="text-xs font-bold text-slate-800">⏳ Belum Beroperasi</div>
+                    <div class="text-[10px] text-slate-500">SPPG Dalam Masa Persiapan</div>
+                  </div>
+                </div>
+                <span id="cb-count-BELUM"
+                  class="px-2 py-0.5 bg-slate-600 text-white rounded-full text-xs font-extrabold">0</span>
+              </label>
+
+              <!-- 3. Suspend Saja -->
+              <label
+                class="flex items-center justify-between p-2.5 rounded-xl border border-amber-200 bg-amber-50/40 hover:bg-amber-50 cursor-pointer transition select-none">
+                <div class="flex items-center gap-2.5">
+                  <input type="checkbox" value="SUSPEND" checked onchange="onStatusCheckboxChange(this)"
+                    class="sppg-status-cb w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer">
+                  <div>
+                    <div class="text-xs font-bold text-amber-900">⏸️ Stop Operasional Sementara</div>
+                    <div class="text-[10px] text-amber-700">Infrastruktur / KF / SPS-2 / Renovasi / Kendala Lain</div>
+                  </div>
+                </div>
+                <span id="cb-count-SUSPEND"
+                  class="px-2 py-0.5 bg-amber-500 text-white rounded-full text-xs font-extrabold">0</span>
+              </label>
+
+              <!-- 4. Stop karena Karhutla -->
+              <label
+                class="flex items-center justify-between p-2.5 rounded-xl border border-orange-200 bg-orange-50/40 hover:bg-orange-50 cursor-pointer transition select-none">
+                <div class="flex items-center gap-2.5">
+                  <input type="checkbox" value="KARHUTLA" checked onchange="onStatusCheckboxChange(this)"
+                    class="sppg-status-cb w-4 h-4 text-orange-600 rounded focus:ring-orange-500 cursor-pointer">
+                  <div>
+                    <div class="text-xs font-bold text-orange-900">🔥 Stop Operasional Karhutla</div>
+                    <div class="text-[10px] text-orange-700">Dampak Karhutla</div>
+                  </div>
+                </div>
+                <span id="cb-count-KARHUTLA"
+                  class="px-2 py-0.5 bg-orange-600 text-white rounded-full text-xs font-extrabold">0</span>
+              </label>
+            </div>
+
+            <!-- Bar Hasil Total Gabungan dari Status yang Diceklis -->
+            <div
+              class="mt-3 p-3 rounded-xl bg-bgn-900 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2 py-0.5 bg-amber-400 text-bgn-900 rounded text-[10px] font-extrabold uppercase">
+                  TOTAL HASIL CEKLIS
+                </span>
+                <span id="checkedSummaryText" class="text-xs text-sky-100 font-medium">
+                  Semua Status Operasional
+                </span>
+              </div>
+              <div class="flex items-center gap-4 text-xs flex-wrap">
+                <div>
+                  Total SPPG Terpilih: <strong id="checkedTotalSppg" class="text-base font-extrabold text-amber-300">0
+                    Unit</strong>
+                </div>
+                <div class="border-l border-white/20 pl-4">
+                  Total Penerima (dari yg diceklis): <strong id="checkedTotalPm"
+                    class="text-base font-extrabold text-emerald-300">0 PM</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- BARIS PETA BATAS REGIONAL KALTIM & GRAFIK CAPAIAN KAB/KOTA -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-up">
+            <div
+              class="lg:col-span-2 bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+              <div class="flex flex-col gap-2.5 mb-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <h3 class="text-sm font-bold text-bgn-900 uppercase">Peta Sebaran Kecamatan &amp; Unit SPPG Kaltim
+                      </h3>
+                      <span id="geoStatusBadge"
+                        class="text-[10px] px-2 py-0.5 bg-blue-50 text-bgn-700 rounded border border-blue-200 font-semibold">
+                        Memuat Batas Wilayah...
+                      </span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">Klik titik Kecamatan atau Unit SPPG untuk melihat rincian
+                      Kelurahan, Status &amp; Penerima Manfaat</p>
+                  </div>
+
+                  <!-- Tombol Switcher Mode Titik Peta -->
+                  <div
+                    class="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-center shrink-0">
+                    <button type="button" id="btnMapMode-KEC" onclick="setMapMarkerMode('KEC')"
+                      class="px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition bg-bgn-800 text-white shadow-2xs cursor-pointer">
+                      📍 Per Kecamatan
+                    </button>
+                    <button type="button" id="btnMapMode-UNIT" onclick="setMapMarkerMode('UNIT')"
+                      class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition text-slate-600 hover:text-bgn-900 cursor-pointer">
+                      🏠 Unit &amp; Kelurahan
+                    </button>
+                    <button type="button" id="btnMapMode-KAB" onclick="setMapMarkerMode('KAB')"
+                      class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition text-slate-600 hover:text-bgn-900 cursor-pointer">
+                      🏛️ Kab/Kota
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Bar Info & Legenda Dinamis Peta -->
+                <div
+                  class="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-200/80 text-[11px]">
+                  <div id="mapActiveCounterText" class="font-bold text-bgn-900">
+                    Menampilkan titik sebaran Kecamatan aktif...
+                  </div>
+                  <div class="flex items-center gap-3 font-semibold flex-wrap text-[10px] sm:text-[11px]">
+                    <span class="flex items-center gap-1"><span
+                        class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Beroperasi</span>
+                    <span class="flex items-center gap-1"><span
+                        class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Suspend</span>
+                    <span class="flex items-center gap-1"><span
+                        class="w-2.5 h-2.5 rounded-full bg-orange-600 inline-block"></span> Karhutla</span>
+                    <span class="flex items-center gap-1"><span
+                        class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"></span> Belum Ops</span>
+                  </div>
+                </div>
+              </div>
+              <div id="map"></div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+              <div>
+                <h3 class="text-sm font-bold text-bgn-900 uppercase">Capaian SPPG per Kabupaten/Kota</h3>
+                <p class="text-xs text-slate-500 mb-3">Perbandingan Target vs Realisasi SPPG</p>
+                <div class="h-80 relative">
+                  <canvas id="kabChart"></canvas>
+                </div>
+
+                <!-- BANNER STATISTIK PENGUNJUNG -->
+                <div
+                  class="mt-3.5 p-2.5 rounded-xl bg-slate-50/90 border border-slate-200/90 flex items-center justify-between text-xs">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                    <span class="text-slate-600 font-medium truncate">Portal Publik Dikunjungi:</span>
+                    <strong id="visitorTotalText"
+                      class="font-extrabold text-bgn-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs shrink-0">1
+                      Kali</strong>
+                  </div>
+                  <div
+                    class="text-[11px] font-semibold text-bgn-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 shrink-0">
+                    Hari ini: <strong id="visitorTodayText" class="font-bold text-bgn-900">1</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEKSI CAPAIAN 10 KABUPATEN / KOTA (DIPINDAH KE HALAMAN PERTAMA) -->
+          <div id="sec-rekap-wilayah" class="space-y-4 sm:space-y-6 scroll-mt-20">
+            <div
+              class="bg-gradient-to-r from-bgn-900 to-bgn-700 text-white rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <span class="px-2.5 py-0.5 bg-amber-400 text-bgn-900 rounded-full text-[10px] font-extrabold uppercase">
+                  ANALISIS KOMPARASI WILAYAH
+                </span>
+                <h2 class="text-xl sm:text-2xl font-extrabold mt-1">
+                  Capaian 10 Kabupaten / Kota se-Kalimantan Timur
+                </h2>
+                <p class="text-xs text-sky-100/90 mt-0.5">
+                  Tabel perbandingan menyeluruh potensi sasaran, target SPPG, realisasi operasional, dan rincian
+                  penerima manfaat resmi.
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="selectKabupaten('SEMUA')"
+                  class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition border border-white/20 cursor-pointer">
+                  🌐 Reset Cakupan Provinsi
+                </button>
+              </div>
+            </div>
+
+            <!-- RINGKASAN TABEL REKAPITULASI 10 KABUPATEN/KOTA (BISA DIKLIK) -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-xs animate-fade-up">
+              <div
+                class="p-4 bg-slate-100 rounded-t-xl border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <h3 class="text-xs font-extrabold text-bgn-900 uppercase tracking-wider">
+                    📊 Tabel Rekapitulasi Capaian 10 Kabupaten / Kota se-Kalimantan Timur
+                  </h3>
+                  <p class="text-[11px] text-slate-500">Klik pada baris Kabupaten/Kota mana saja untuk melihat daftar
+                    unit SPPG di wilayah tersebut</p>
+                </div>
+
+                <!-- Filter Dropdown Checkbox Jenis Mitra SPPG (Kolom D Sheet KALTIM) -->
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <div id="rekapMitraDropdownWrap" class="relative w-full sm:w-auto">
+                    <button type="button" id="rekapMitraDropdownBtn" onclick="toggleRekapMitraDropdown(event)"
+                      class="w-full sm:w-64 text-xs text-slate-800 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 font-bold focus:outline-none flex items-center justify-between gap-2 shadow-2xs cursor-pointer">
+                      <span id="rekapMitraDropdownLabel" class="truncate">☑️ Semua Jenis Mitra SPPG</span>
+                      <span class="text-[10px] text-slate-500 shrink-0">▼</span>
+                    </button>
+
+                    <!-- Menu Popup Pilihan Jenis Mitra (Kolom D) -->
+                    <div id="rekapMitraDropdownMenu" onclick="event.stopPropagation()"
+                      class="hidden absolute left-0 sm:right-0 sm:left-auto mt-1.5 w-full sm:w-80 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 z-40 overflow-hidden">
+                      <div class="p-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-1.5">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-bgn-900">Filter Jenis Mitra (Kolom D):</span>
+                        <div class="flex items-center gap-1">
+                          <button type="button" onclick="setRekapMitraQuick(true)"
+                            class="px-2 py-0.5 bg-bgn-50 hover:bg-bgn-100 text-bgn-800 border border-blue-200 rounded text-[10px] font-bold cursor-pointer">
+                            Pilih Semua
+                          </button>
+                          <button type="button" onclick="setRekapMitraQuick(false)"
+                            class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded text-[10px] font-bold cursor-pointer">
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+                      <div id="rekapMitraCheckboxList" class="max-h-72 overflow-y-auto divide-y divide-slate-100 p-1.5">
+                        <div class="p-3 text-center text-xs text-slate-400">Memuat daftar jenis mitra...</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span
+                    class="sm:hidden text-[10px] font-bold text-bgn-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                    💡 Geser tabel ke kanan &rarr;
+                  </span>
+                </div>
+              </div>
+              <div class="overflow-x-auto rounded-b-xl">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead class="bg-bgn-50 text-bgn-900 font-bold border-b border-blue-200">
+                    <tr>
+                      <th class="p-3">No</th>
+                      <th class="p-3">Kabupaten / Kota</th>
+                      <th class="p-3 text-center">Total SPPG</th>
+                      <th class="p-3 text-right">Potensi Sasaran</th>
+                      <th class="p-3 text-right">PM 3B</th>
+                      <th class="p-3 text-right">PM Siswa</th>
+                      <th class="p-3 text-right">Tendik &amp; Non-Tendik</th>
+                      <th class="p-3 text-right">Total Penerima Manfaat</th>
+                      <th class="p-3 text-center">Persentase PM</th>
+                      <th class="p-3 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rekapKabTableBody" class="divide-y divide-slate-100"></tbody>
+                  <tfoot id="rekapKabTableFoot"
+                    class="bg-slate-100/90 font-extrabold text-bgn-900 border-t-2 border-slate-300"></tfoot>
+                </table>
+              </div>
+            </div>
+
+            <!-- Penjelasan Metrik Wilayah -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                <div class="font-extrabold text-bgn-900 text-sm mb-1">🎯 Target vs Realisasi</div>
+                <p class="text-slate-600 leading-relaxed">
+                  Target SPPG ditentukan berdasarkan pemetaan wilayah pemenuhan gizi BGN. Persentase menunjukkan rasio
+                  SPPG beroperasi aktif terhadap kuota target kabupaten/kota.
+                </p>
+              </div>
+              <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                <div class="font-extrabold text-amber-700 text-sm mb-1">👶 Kelompok 3B Prioritas</div>
+                <p class="text-slate-600 leading-relaxed">
+                  Kelompok 3B mencakup Balita, Ibu Hamil, dan Ibu Menyusui sebagai target intervensi pencegahan stunting
+                  dan pemenuhan gizi krusial 1.000 HPK.
+                </p>
+              </div>
+              <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                <div class="font-extrabold text-indigo-700 text-sm mb-1">🎓 Siswa &amp; Tenaga Pendidik</div>
+                <p class="text-slate-600 leading-relaxed">
+                  Penerima manfaat anak usia sekolah (PAUD, SD, SMP, SMA sederajat) serta tenaga pendidik dan
+                  kependidikan di satuan pendidikan terdata.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- PAGE 2: DIREKTORI / PROFIL LENGKAP SPPG -->
+        <div id="page-direktori" class="app-page hidden space-y-4 sm:space-y-6">
+          <div
+            class="bg-gradient-to-r from-bgn-900 to-bgn-700 text-white rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <span class="px-2.5 py-0.5 bg-amber-400 text-bgn-900 rounded-full text-[10px] font-extrabold uppercase">
+                DIREKTORI UNIT SPPG
+              </span>
+              <h2 class="text-xl sm:text-2xl font-extrabold mt-1">
+                Katalog &amp; Penelusuran Satuan Pelayanan (SPPG)
+              </h2>
+              <p class="text-xs text-sky-100/90 mt-0.5">
+                Cari unit SPPG berdasarkan nama, yayasan, kecamatan, atau kelurahan di seluruh Provinsi Kalimantan
+                Timur.
+              </p>
+            </div>
+            <!-- Switcher View Mode (Tabel vs Kartu) -->
+            <div class="inline-flex items-center bg-white/10 p-1 rounded-xl border border-white/20 shrink-0">
+              <button type="button" id="btnViewTable" onclick="setSppgViewMode('TABLE')"
+                class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition bg-white text-bgn-900 shadow-2xs cursor-pointer">
+                📋 Format Tabel
+              </button>
+              <button type="button" id="btnViewCards" onclick="setSppgViewMode('CARDS')"
+                class="px-3 py-1.5 rounded-lg text-xs font-bold transition text-white/80 hover:text-white cursor-pointer">
+                🗂️ Format Kartu
+              </button>
+            </div>
+          </div>
+
+          <!-- BAGIAN DAFTAR RINCI UNIT SPPG (DARI SHEET KALTIM) -->
+          <div id="sppgSection" class="bg-white rounded-xl border border-slate-200 shadow-sm scroll-mt-20">
+            <div
+              class="p-4 bg-bgn-900 text-white rounded-t-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-extrabold uppercase">
+                    DAFTAR SATUAN PELAYANAN PEMENUHAN GIZI (SPPG)
+                  </h3>
+                  <span id="sppgCountBadge"
+                    class="px-2.5 py-0.5 bg-amber-400 text-bgn-900 rounded-full text-xs font-extrabold">
+                    0 Unit
+                  </span>
+                </div>
+                <p id="sppgSubheader" class="text-[11px] text-sky-200 mt-0.5">
+                  Menampilkan seluruh unit SPPG di Provinsi Kalimantan Timur
+                </p>
+              </div>
+
+              <!-- Filter Bar Tabel SPPG (Dropdown Checkbox 16 Status Rinci + Pencarian) -->
+              <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <div id="detailStatusDropdownWrap" class="relative w-full sm:w-auto">
+                  <button type="button" id="detailStatusDropdownBtn" onclick="toggleDetailStatusDropdown(event)"
+                    class="w-full sm:w-64 text-xs text-slate-800 bg-white hover:bg-slate-50 rounded-lg px-3 py-1.5 font-bold focus:outline-none flex items-center justify-between gap-2 shadow-2xs cursor-pointer">
+                    <span id="detailStatusDropdownLabel" class="truncate">☑️ Semua Status SPPG (16)</span>
+                    <span class="text-[10px] text-slate-500 shrink-0">▼</span>
+                  </button>
+
+                  <!-- Panel Dropdown Checkbox (Pilih Lebih dari Satu) -->
+                  <div id="detailStatusDropdownMenu" onclick="event.stopPropagation()"
+                    class="hidden absolute left-0 sm:right-0 sm:left-auto mt-1.5 w-full sm:w-88 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 z-40 overflow-hidden">
+                    <div class="p-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-1.5">
+                      <span class="text-[10px] font-extrabold uppercase tracking-wider text-bgn-900">Filter Status
+                        SPPG:</span>
+                      <div class="flex items-center gap-1">
+                        <button type="button" onclick="setDetailStatusQuick('ALL')"
+                          class="px-2 py-0.5 bg-bgn-50 hover:bg-bgn-100 text-bgn-800 border border-blue-200 rounded text-[10px] font-bold cursor-pointer">
+                          Pilih Semua
+                        </button>
+                        <button type="button" onclick="setDetailStatusQuick('STOP_ONLY')"
+                          class="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 rounded text-[10px] font-bold cursor-pointer">
+                          Suspend/Stop
+                        </button>
+                        <button type="button" onclick="setDetailStatusQuick('NONE')"
+                          class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded text-[10px] font-bold cursor-pointer">
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+                    <div id="detailStatusCheckboxList" class="max-h-80 overflow-y-auto divide-y divide-slate-100 p-1.5">
+                    </div>
+                  </div>
+                </div>
+
+                <input type="text" id="sppgSearchInput" onkeyup="renderSppgTable()"
+                  placeholder="Cari Nama SPPG / Yayasan / Kecamatan..."
+                  class="text-xs text-slate-800 bg-white rounded-lg px-3 py-1.5 w-full sm:w-60 focus:outline-none">
+              </div>
+            </div>
+
+            <div class="overflow-x-auto max-h-[600px] rounded-b-xl">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="bg-bgn-50 text-bgn-900 sticky top-0 font-bold border-b border-blue-200 z-10">
+                  <tr>
+                    <th class="p-3">No</th>
+                    <th class="p-3">Kabupaten / Kota</th>
+                    <th class="p-3">Nama SPPG &amp; Lokasi</th>
+                    <th class="p-3">Yayasan</th>
+                    <th class="p-3 text-center">Status Operasional</th>
+                    <th class="p-3">Kepala SPPG</th>
+                    <th class="p-3 text-right">PM 3B</th>
+                    <th class="p-3 text-right">PM Siswa</th>
+                    <th class="p-3 text-right">Tendik &amp; Non-Tendik</th>
+                    <th class="p-3 text-right">Total Penerima</th>
+                    <th class="p-3 text-center">Sertifikasi Dapur</th>
+                    <th class="p-3 text-center">Detail</th>
+                  </tr>
+                </thead>
+                <tbody id="sppgTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Container Tampilan Kartu Katalog (Alternatif Tabel) -->
+          <div id="sppgCardsContainer" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+        <!-- PAGE 4: DATA SERTIFIKASI SPPG -->
+        <div id="page-sertifikasi" class="app-page hidden space-y-4 sm:space-y-6">
+          <div
+            class="bg-gradient-to-r from-bgn-900 to-bgn-700 text-white rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <span class="px-2.5 py-0.5 bg-amber-400 text-bgn-900 rounded-full text-[10px] font-extrabold uppercase">
+                STANDAR MUTU &amp; KELAIKAN
+              </span>
+              <h2 class="text-xl sm:text-2xl font-extrabold mt-1">
+                Transparansi Sertifikasi &amp; Jaminan Higiene SPPG
+              </h2>
+              <p class="text-xs text-sky-100/90 mt-0.5">
+                Pemantauan kepatuhan sertifikasi SLHS Dinkes, Halal, Chef BNSP, dan BPJS Ketenagakerjaan di Kalimantan
+                Timur.
+              </p>
+            </div>
+          </div>
+
+          <!-- 4 Kartu Ringkasan Standar Mutu Wilayah Aktif -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div class="bg-white p-4 rounded-xl border-l-4 border-l-blue-600 border border-slate-200 shadow-xs">
+              <div class="text-[10px] text-slate-500 font-bold uppercase">Perlindungan Ketenagakerjaan</div>
+              <div class="text-xl sm:text-2xl font-extrabold text-blue-900 mt-1" id="certPage-bpjs">-</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">BPJS Relawan SPPG</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border-l-4 border-l-emerald-600 border border-slate-200 shadow-xs">
+              <div class="text-[10px] text-slate-500 font-bold uppercase">Laik Higiene Sanitasi (SLHS)</div>
+              <div class="text-xl sm:text-2xl font-extrabold text-emerald-700 mt-1" id="certPage-slhs">-</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">Dinas Kesehatan Resmi</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border-l-4 border-l-indigo-600 border border-slate-200 shadow-xs">
+              <div class="text-[10px] text-slate-500 font-bold uppercase">Sertifikasi Halal Dapur</div>
+              <div class="text-xl sm:text-2xl font-extrabold text-indigo-700 mt-1" id="certPage-halal">-</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">BPJPH / MUI Resmi</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border-l-4 border-l-amber-500 border border-slate-200 shadow-xs">
+              <div class="text-[10px] text-slate-500 font-bold uppercase">Juru Masak Bersertifikat</div>
+              <div class="text-xl sm:text-2xl font-extrabold text-amber-600 mt-1" id="certPage-chef">-</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">Chef BNSP Terakreditasi</div>
+            </div>
+          </div>
+
+          <!-- Tabel Audit Standar Kelaikan SPPG -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div
+              class="p-4 bg-bgn-900 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div>
+                <h3 class="text-sm font-extrabold uppercase">Daftar Audit Sertifikasi Satuan Pelayanan (SPPG)</h3>
+                <p class="text-[11px] text-sky-200 mt-0.5">Menampilkan status verifikasi SLHS, Halal, Chef, dan BPJS</p>
+              </div>
+              <input type="text" id="certSearchInput" onkeyup="renderCertTable()" placeholder="Cari SPPG / Wilayah..."
+                class="text-xs text-slate-800 bg-white rounded-lg px-3 py-1.5 w-full sm:w-60 focus:outline-none">
+            </div>
+            <div class="overflow-x-auto max-h-[600px]">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="bg-bgn-50 text-bgn-900 sticky top-0 font-bold border-b border-blue-200 z-10">
+                  <tr>
+                    <th class="p-3">No</th>
+                    <th class="p-3">Kabupaten / Kota</th>
+                    <th class="p-3">Nama SPPG</th>
+                    <th class="p-3">Status Operasional</th>
+                    <th class="p-3 text-center">SLHS Dinkes</th>
+                    <th class="p-3 text-center">Sertif Halal</th>
+                    <th class="p-3 text-center">Chef BNSP</th>
+                    <th class="p-3 text-center">BPJS TK</th>
+                    <th class="p-3 text-center">Detail</th>
+                  </tr>
+                </thead>
+                <tbody id="certTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- PAGE 5: INFORMASI PROGRAM / FAQ / KONTAK -->
+        <div id="page-informasi" class="app-page hidden space-y-4 sm:space-y-6">
+          <div class="bg-gradient-to-r from-bgn-900 to-bgn-700 text-white rounded-2xl p-5 shadow-sm">
+            <span class="px-2.5 py-0.5 bg-amber-400 text-bgn-900 rounded-full text-[10px] font-extrabold uppercase">
+              TENTANG &amp; PANDUAN RESMI
+            </span>
+            <h2 class="text-xl sm:text-2xl font-extrabold mt-1">
+              Program Makan Bergizi Gratis (MBG) &ndash; Badan Gizi Nasional
+            </h2>
+            <p class="text-xs text-sky-100/90 mt-1 max-w-3xl leading-relaxed">
+              Program prioritas nasional pemerintah Republik Indonesia untuk memastikan pemenuhan gizi seimbang bagi
+              anak usia sekolah, balita, ibu hamil, dan ibu menyusui guna mewujudkan Generasi Emas Indonesia 2045.
+            </p>
+          </div>
+
+          <!-- 3 Pilar Utama -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div
+              class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-3">
+              <div>
+                <div
+                  class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center text-lg font-bold mb-3">
+                  🎯
+                </div>
+                <h4 class="font-extrabold text-bgn-900 text-sm">Target Penerima Manfaat</h4>
+                <p class="text-slate-600 text-xs mt-1 leading-relaxed">
+                  Peserta didik pada jenjang PAUD, SD, SMP, SMA sederajat, tenaga pendidik, serta Kelompok 3B (Balita,
+                  Ibu Hamil, dan Ibu Menyusui) di seluruh wilayah Kalimantan Timur.
+                </p>
+              </div>
+            </div>
+
+            <div
+              class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-3">
+              <div>
+                <div
+                  class="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center text-lg font-bold mb-3">
+                  🍲
+                </div>
+                <h4 class="font-extrabold text-bgn-900 text-sm">Standar Gizi &amp; Mutu Dapur</h4>
+                <p class="text-slate-600 text-xs mt-1 leading-relaxed">
+                  Setiap porsi makanan dirancang oleh Ahli Gizi terstandar, dimasak oleh Juru Masak (Chef) bersertifikat
+                  BNSP, serta diolah di Dapur SPPG dengan Sertifikat Laik Higiene Sanitasi (SLHS) dan Halal.
+                </p>
+              </div>
+            </div>
+
+            <div
+              class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-3">
+              <div>
+                <div
+                  class="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center text-lg font-bold mb-3">
+                  🤝
+                </div>
+                <h4 class="font-extrabold text-bgn-900 text-sm">Kemitraan Satuan Pelayanan</h4>
+                <p class="text-slate-600 text-xs mt-1 leading-relaxed">
+                  Pengelolaan dapur SPPG bermitra dengan yayasan, koperasi, dan badan hukum terverifikasi yang memenuhi
+                  persyaratan teknis, sarana sanitasi, serta tata kelola akuntansi transparan.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- FAQ (Tanya Jawab Seputar MBG) -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4">
+            <h3 class="text-sm font-extrabold text-bgn-900 uppercase tracking-wider flex items-center gap-2">
+              <span>❓ Tanya Jawab Populer (FAQ)</span>
+            </h3>
+            <div class="space-y-3 text-xs">
+              <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                <div class="font-extrabold text-bgn-900 mb-1">Q: Apa itu Satuan Pelayanan Pemenuhan Gizi (SPPG)?</div>
+                <div class="text-slate-600 leading-relaxed">
+                  SPPG adalah unit operasional dapur higienis resmi yang bertugas memproduksi dan mendistribusikan paket
+                  makanan bergizi gratis ke sekolah-sekolah dan posyandu sasaran di setiap kecamatan/kelurahan.
+                </div>
+              </div>
+              <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                <div class="font-extrabold text-bgn-900 mb-1">Q: Mengapa ada unit SPPG dengan status Suspend atau Stop
+                  Operasional?</div>
+                <div class="text-slate-600 leading-relaxed">
+                  Penghentian sementara dapat terjadi akibat faktor mutu (perbaikan sarana IPAL, renovasi dapur,
+                  kalibrasi menu), kendala administrasi, maupun faktor force majeure bencana lingkungan seperti kabut
+                  asap / karhutla demi menjamin keselamatan anak-anak.
+                </div>
+              </div>
+              <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                <div class="font-extrabold text-bgn-900 mb-1">Q: Bagaimana cara mengajukan kemitraan SPPG atau
+                  menyampaikan pengaduan?</div>
+                <div class="text-slate-600 leading-relaxed">
+                  Masyarakat dan yayasan dapat menghubungi Call Center Resmi BGN Kalimantan Timur melalui tombol
+                  WhatsApp yang tersedia di pojok kanan bawah portal ini.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kontak & Saluran Pengaduan Resmi -->
+          <div
+            class="bg-gradient-to-r from-bgn-900 via-bgn-800 to-emerald-900 text-white rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="space-y-1 text-center md:text-left">
+              <h3 class="text-lg font-extrabold">Pusat Informasi &amp; Call Center BGN Kaltim</h3>
+              <p class="text-xs text-sky-100/90">
+                Layanan pengaduan distribusi makanan, konsultasi kemitraan yayasan, dan klarifikasi data publik.
+              </p>
+              <div class="text-[11px] text-emerald-300 font-semibold pt-1">
+                Senin &ndash; Jumat &bull; 08.00 &ndash; 17.00 WITA
+              </div>
+            </div>
+            <div class="flex items-center gap-2.5 shrink-0">
+              <button type="button" onclick="sendCallCenterTopic(1)"
+                class="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-extrabold shadow-md transition flex items-center gap-2 cursor-pointer">
+                <span>💬 Chat Call Center WA &rarr;</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- FOOTER DALAM CONTENT AREA -->
+      <footer class="bg-bgn-900 text-white/70 text-xs py-4 border-t border-bgn-800 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+          <div>&copy; 2026 Badan Gizi Nasional (BGN) - Dashboard Publik Provinsi Kalimantan Timur</div>
+          <div>Data Privasi Terlindungi &bull; Dev. @imam_daichi</div>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- MODAL POP-UP PROFIL PUBLIK SPPG -->
+  <div id="detailModal"
+    class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-blue-100">
+      <div
+        class="bg-gradient-to-r from-bgn-900 to-bgn-700 text-white p-5 flex justify-between items-start sticky top-0">
+        <div>
+          <span id="mdl-kab"
+            class="text-[10px] font-extrabold uppercase tracking-wider bg-amber-400 text-bgn-900 px-2 py-0.5 rounded">KABUPATEN</span>
+          <h3 id="mdl-nama" class="text-lg font-extrabold mt-1">Nama SPPG</h3>
+          <p id="mdl-id" class="text-xs text-sky-200">ID SPPG: - | Jenis: -</p>
+        </div>
+        <button onclick="closeModal()"
+          class="text-white/80 hover:text-white text-2xl font-bold px-2 leading-none cursor-pointer">&times;</button>
+      </div>
+      <div class="p-5 space-y-4 text-xs" id="mdl-body"></div>
+    </div>
+  </div>
+
+  <!-- WIDGET FLOATING CALL CENTER WHATSAPP (POJOK KANAN BAWAH) -->
+  <div class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 flex flex-col items-end">
+    <div id="callCenterPopup"
+      class="hidden mb-3 w-80 sm:w-88 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-fade-up">
+      <div
+        class="bg-gradient-to-r from-bgn-900 via-bgn-800 to-emerald-800 text-white p-4 flex items-start justify-between gap-2">
+        <div class="flex items-center gap-2.5">
+          <div
+            class="w-10 h-10 rounded-full bg-white/15 border border-white/25 flex items-center justify-center text-xl shrink-0">
+            🎧
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-300">Layanan Publik
+                Aktif</span>
+            </div>
+            <h4 class="text-sm font-extrabold leading-tight mt-0.5">Call Center BGN Kaltim</h4>
+            <p class="text-[10px] text-sky-100/90">Informasi &amp; Pengaduan Program MBG</p>
+          </div>
+        </div>
+        <button onclick="toggleCallCenterPopup()"
+          class="text-white/80 hover:text-white text-xl font-bold px-1.5 leading-none cursor-pointer">&times;</button>
+      </div>
+
+      <div class="p-4 space-y-3 text-xs bg-slate-50/70">
+        <div class="bg-white p-3 rounded-xl border border-slate-200/90 text-slate-600 leading-relaxed shadow-2xs">
+          Halo! 👋 Silakan pilih topik bantuan di bawah atau tulis pesan untuk terhubung langsung ke <strong
+            class="text-bgn-900">WhatsApp Resmi Call Center BGN Kaltim</strong>:
+        </div>
+
+        <div class="space-y-1.5">
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-0.5">Pilih Topik Cepat:
+          </div>
+          <button onclick="sendCallCenterTopic(1)"
+            class="w-full text-left px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 hover:text-emerald-900 font-semibold flex items-center justify-between transition cursor-pointer shadow-2xs">
+            <span>💬 Informasi Umum Program MBG</span>
+            <span class="text-emerald-600 font-bold">&rarr;</span>
+          </button>
+          <button onclick="sendCallCenterTopic(2)"
+            class="w-full text-left px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 hover:text-emerald-900 font-semibold flex items-center justify-between transition cursor-pointer shadow-2xs">
+            <span>🤝 Informasi Kemitraan &amp; SPPG</span>
+            <span class="text-emerald-600 font-bold">&rarr;</span>
+          </button>
+          <button onclick="sendCallCenterTopic(3)"
+            class="w-full text-left px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 hover:text-emerald-900 font-semibold flex items-center justify-between transition cursor-pointer shadow-2xs">
+            <span>📢 Layanan Pengaduan &amp; Masukan</span>
+            <span class="text-emerald-600 font-bold">&rarr;</span>
+          </button>
+        </div>
+
+        <div class="pt-1 border-t border-slate-200/80 space-y-2">
+          <input type="text" id="ccCustomMessage" placeholder="Atau ketik pesan Anda di sini..."
+            onkeydown="if(event.key==='Enter') sendCustomCallCenterWA()"
+            class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-emerald-600">
+          <button onclick="sendCustomCallCenterWA()"
+            class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer">
+            <span>🟢</span>
+            <span>Chat WhatsApp Sekarang &nearr;</span>
+          </button>
+        </div>
+
+        <div class="text-[10px] text-center text-slate-400 pt-0.5">
+          Jam Operasional: Senin &ndash; Jumat &bull; 08.00 &ndash; 17.00 WITA
+        </div>
+      </div>
+    </div>
+
+    <button onclick="toggleCallCenterPopup()" id="callCenterFab"
+      class="group flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-600 text-white font-extrabold text-xs shadow-xl border-2 border-white transition-all duration-200 hover:scale-105 cursor-pointer">
+      <span class="relative flex h-3 w-3">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+      </span>
+      <span class="text-base leading-none">🎧</span>
+      <span>Call Center WA</span>
+    </button>
+  </div>
+
+
+
+  <script>
+    // =========================================================================
+    // KONFIGURASI DATABASE GOOGLE SPREADSHEET (100% TANPA GOOGLE APPS SCRIPT)
+    // =========================================================================
+    // Ganti SPREADSHEET_ID di bawah ini dengan ID Google Spreadsheet Anda
+    var SPREADSHEET_ID = '1fD0XMxZt8kAYpguk1N9aDZNhm8fqqOTzoRbqOMJMD__Xhr57_wNLt0av';
+    var SHEET_REKAPITULASI = 'REKAPITULASI';
+    var SHEET_KALTIM = 'KALTIM';
+
+    // Nomor WhatsApp Call Center BGN Kaltim
+    var CALL_CENTER_WA_NUMBER = '6281234567890';
+
+    // =========================================================================
+    // SPA NAVIGATION (5 HALAMAN: MONITORING, WILAYAH, DIREKTORI, SERTIFIKASI, INFO)
+    // =========================================================================
+    var currentPageId = 'monitoring';
+    var sppgViewMode = 'TABLE';
+
+    function openSidebar() {
+      var sidebar = document.getElementById('appSidebar');
+      var backdrop = document.getElementById('sidebarBackdrop');
+      if (sidebar) sidebar.classList.add('drawer-open');
+      if (backdrop) backdrop.classList.add('drawer-open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+      var sidebar = document.getElementById('appSidebar');
+      var backdrop = document.getElementById('sidebarBackdrop');
+      if (sidebar) sidebar.classList.remove('drawer-open');
+      if (backdrop) backdrop.classList.remove('drawer-open');
+      document.body.style.overflow = '';
+    }
+
+    function toggleSidebar() {
+      var sidebar = document.getElementById('appSidebar');
+      if (!sidebar) return;
+      if (sidebar.classList.contains('drawer-open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    }
+
+
+
+    function switchPage(pageName) {
+      if (pageName === 'wilayah') {
+        goToWilayah();
+        return;
+      }
+      currentPageId = pageName;
+      var pages = ['monitoring', 'direktori', 'sertifikasi', 'informasi'];
+
+      pages.forEach(function (p) {
+        var el = document.getElementById('page-' + p);
+        var navBtn = document.getElementById('nav-' + p);
+        if (el) {
+          if (p === pageName) {
+            el.classList.remove('hidden');
+          } else {
+            el.classList.add('hidden');
+          }
+        }
+        if (navBtn) {
+          if (p === pageName) {
+            navBtn.classList.add('nav-item-active');
+          } else {
+            navBtn.classList.remove('nav-item-active');
+          }
+        }
+      });
+
+      var navWilayah = document.getElementById('nav-wilayah');
+      if (navWilayah) navWilayah.classList.remove('nav-item-active');
+
+      closeSidebar();
+
+      if (pageName === 'monitoring') {
+        renderRekapKabTable();
+        if (map) {
+          setTimeout(function () { map.invalidateSize(); }, 150);
+        }
+      } else if (pageName === 'direktori') {
+        renderSppgTable();
+      } else if (pageName === 'sertifikasi') {
+        renderCertTable();
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setSppgViewMode(mode) {
+      sppgViewMode = mode;
+      var btnTable = document.getElementById('btnViewTable');
+      var btnCards = document.getElementById('btnViewCards');
+      var tblWrapper = document.getElementById('sppgSection');
+      var cardsWrap = document.getElementById('sppgCardsContainer');
+
+      if (mode === 'CARDS') {
+        if (btnTable) {
+          btnTable.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition text-white/80 hover:text-white cursor-pointer';
+        }
+        if (btnCards) {
+          btnCards.className = 'px-3 py-1.5 rounded-lg text-xs font-extrabold transition bg-white text-bgn-900 shadow-2xs cursor-pointer';
+        }
+        if (tblWrapper) tblWrapper.classList.add('hidden');
+        if (cardsWrap) cardsWrap.classList.remove('hidden');
+      } else {
+        if (btnTable) {
+          btnTable.className = 'px-3 py-1.5 rounded-lg text-xs font-extrabold transition bg-white text-bgn-900 shadow-2xs cursor-pointer';
+        }
+        if (btnCards) {
+          btnCards.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition text-white/80 hover:text-white cursor-pointer';
+        }
+        if (tblWrapper) tblWrapper.classList.remove('hidden');
+        if (cardsWrap) cardsWrap.classList.add('hidden');
+      }
+      renderSppgTable();
+    }
+
+    /**
+     * FUNGSI: renderCertTable()
+     * ------------------------------------------------------------------------
+     * Menampilkan data progres dan Tabel Audit Sertifikasi SPPG (Halaman 4):
+     * Menghitung persentase kelaikan SLHS Dinkes, Sertifikat Halal, Chef BNSP,
+     * dan BPJS Ketenagakerjaan berdasarkan unit SPPG di wilayah yang dipilih.
+     */
+    function renderCertTable() {
+      if (!DB) return;
+      var q = (document.getElementById('certSearchInput') ? document.getElementById('certSearchInput').value : '').toLowerCase();
+
+      var list = DB.sppgItems.filter(function (it) {
+        var matchKab = (selectedKab === 'SEMUA') || (it.kabupaten === selectedKab);
+        var blob = (it.namaSppg + ' ' + it.kabupaten + ' ' + it.yayasan + ' ' + it.status).toLowerCase();
+        var matchQ = !q || blob.indexOf(q) !== -1;
+        return matchKab && matchQ;
+      });
+
+      var dataRef = (selectedKab === 'SEMUA') ? DB.provTotal : (DB.kabMap[selectedKab] || DB.provTotal);
+      var cBpjs = document.getElementById('certPage-bpjs');
+      var cSlhs = document.getElementById('certPage-slhs');
+      var cHalal = document.getElementById('certPage-halal');
+      var cChef = document.getElementById('certPage-chef');
+
+      if (cBpjs) cBpjs.innerText = (dataRef.bpjsSudah || 0) + ' SPPG';
+      if (cSlhs) cSlhs.innerText = (dataRef.slhsSudah || 0) + ' SPPG';
+      if (cHalal) cHalal.innerText = (dataRef.halalSudah || 0) + ' SPPG';
+      if (cChef) cChef.innerText = (dataRef.chefSudah || 0) + ' SPPG';
+
+      var tbody = document.getElementById('certTableBody');
+      if (!tbody) return;
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-400">Tidak ada unit SPPG yang sesuai dengan filter pencarian sertifikasi.</td></tr>';
+        return;
+      }
+
+      function certBadge(val, label) {
+        var isYes = String(val || '').toLowerCase().indexOf('sudah') !== -1 || String(val || '').toLowerCase().indexOf('ada') !== -1;
+        if (isYes) {
+          return '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">✅ Terverifikasi</span>';
+        }
+        return '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">⏳ Belum</span>';
+      }
+
+      tbody.innerHTML = list.map(function (r, idx) {
+        var detSt = getItemDetailedStatusObj(r);
+        return (
+          '<tr class="hover:bg-blue-50/40 transition align-middle">' +
+          '<td class="p-3 text-slate-400 font-semibold">' + (idx + 1) + '</td>' +
+          '<td class="p-3 font-bold text-bgn-900">' + r.kabupaten + '</td>' +
+          '<td class="p-3">' +
+          '<div class="font-bold text-slate-900">' + r.namaSppg + '</div>' +
+          '<div class="text-[10px] text-slate-500">' + r.yayasan + '</div>' +
+          '</td>' +
+          '<td class="p-3">' +
+          '<span style="' + detSt.pillStyle + 'display:inline-block;padding:2px 8px;border-radius:9999px;font-size:9.5px;font-weight:700;">' +
+          r.status +
+          '</span>' +
+          '</td>' +
+          '<td class="p-3 text-center">' + certBadge(r.slhs, 'SLHS') + '</td>' +
+          '<td class="p-3 text-center">' + certBadge(r.halal, 'Halal') + '</td>' +
+          '<td class="p-3 text-center">' + certBadge(r.chef, 'Chef') + '</td>' +
+          '<td class="p-3 text-center">' + certBadge(r.bpjs, 'BPJS') + '</td>' +
+          '<td class="p-3 text-center">' +
+          '<button onclick="openPublicModalById(\'' + r.idSppg + '\')" class="px-2 py-1 bg-bgn-700 hover:bg-bgn-800 text-white rounded text-[10px] font-bold transition cursor-pointer">' +
+          '🔍 Profil' +
+          '</button>' +
+          '</td>' +
+          '</tr>'
+        );
+      }).join('');
+    }
+
+    var DB = null;
+    var selectedKab = 'SEMUA';
+    var currentFilteredSppg = [];
+    var map = null;
+    var markersLayer = null;
+    var geojsonLayer = null;
+    var kabChartInstance = null;
+    var kaltimGeoJsonData = null;
+    var layerByKabName = {};
+
+    var GEOJSON_URLS = [
+      'https://raw.githubusercontent.com/superpikar/indonesia-geojson/master/indonesia-province-city-regency.json',
+      'https://raw.githubusercontent.com/ans-4175/peta-indonesia-geojson/master/indonesia-kab.geojson'
+    ];
+
+    window.addEventListener('DOMContentLoaded', function () {
+      var pillsEl = document.getElementById('kabPillsContainer');
+      if (pillsEl) {
+        pillsEl.addEventListener('wheel', function (e) {
+          if (e.deltaY !== 0) {
+            e.preventDefault();
+            pillsEl.scrollLeft += e.deltaY;
+          }
+        }, { passive: false });
+      }
+      document.addEventListener('click', function () {
+        var menu = document.getElementById('detailStatusDropdownMenu');
+        if (menu && !menu.classList.contains('hidden')) {
+          menu.classList.add('hidden');
+        }
+        var mitraMenu = document.getElementById('rekapMitraDropdownMenu');
+        if (mitraMenu && !mitraMenu.classList.contains('hidden')) {
+          mitraMenu.classList.add('hidden');
+        }
+      });
+      initDetailStatusDropdown();
+      initMap();
+      loadKaltimBoundaries();
+      loadDashboardData();
+    });
+
+    async function loadDashboardData() {
+      var badge = document.getElementById('statusLoadBadge');
+      if (badge) {
+        badge.className = 'text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-200 border border-amber-300/30 animate-pulse';
+        badge.innerText = 'Menghubungkan ke Google Sheet...';
+      }
+
+      try {
+        if (typeof loadKaltimDashboardDataDirect !== 'function') {
+          throw new Error('Modul sheets-api.js tidak terdeteksi.');
+        }
+
+        var data = await loadKaltimDashboardDataDirect(SPREADSHEET_ID, SHEET_REKAPITULASI, SHEET_KALTIM);
+        onDataLoaded(data);
+      } catch (err) {
+        console.error('Error saat membaca Google Spreadsheet:', err);
+        onDataError(err);
+      }
+    }
+
+    function initMap() {
+      map = L.map('map').setView([0.45, 116.4], 6.5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      markersLayer = L.layerGroup().addTo(map);
+    }
+
+    function matchKabFromGeoProp(props) {
+      var raw = String(
+        props.NAME_2 || props.kabkot || props.WADMKK || props.alt_name || props.name || props.NAMA_KAB || ''
+      ).toUpperCase();
+
+      if (raw.indexOf('BALIKPAPAN') !== -1) return 'KOTA BALIKPAPAN';
+      if (raw.indexOf('SAMARINDA') !== -1) return 'KOTA SAMARINDA';
+      if (raw.indexOf('BONTANG') !== -1) return 'KOTA BONTANG';
+      if (raw.indexOf('PENAJAM') !== -1) return 'PENAJAM PASER UTARA';
+      if (raw.indexOf('KARTANEGARA') !== -1) return 'KUTAI KARTANEGARA';
+      if (raw.indexOf('KUTAI TIMUR') !== -1) return 'KUTAI TIMUR';
+      if (raw.indexOf('KUTAI BARAT') !== -1) return 'KUTAI BARAT';
+      if (raw.indexOf('MAHAKAM') !== -1) return 'MAHAKAM ULU';
+      if (raw.indexOf('BERAU') !== -1) return 'BERAU';
+      if (raw.indexOf('PASER') !== -1) return 'PASER';
+      return null;
+    }
+
+    async function loadKaltimBoundaries() {
+      var badge = document.getElementById('geoStatusBadge');
+      for (var i = 0; i < GEOJSON_URLS.length; i++) {
+        var url = GEOJSON_URLS[i];
+        try {
+          var res = await fetch(url);
+          if (!res.ok) continue;
+          var fullGeo = await res.json();
+          if (!fullGeo || !fullGeo.features) continue;
+
+          var kaltimFeatures = fullGeo.features.filter(function (f) {
+            var kName = matchKabFromGeoProp(f.properties || {});
+            return kName !== null;
+          });
+
+          if (kaltimFeatures.length > 0) {
+            kaltimGeoJsonData = { type: 'FeatureCollection', features: kaltimFeatures };
+            if (badge) {
+              badge.innerText = '🗺️ Batas Wilayah Aktif';
+              badge.classList.replace('text-bgn-700', 'text-emerald-700');
+            }
+            if (DB) renderRegionalPolygons();
+            return;
+          }
+        } catch (e) {
+          console.warn('Mencoba sumber GeoJSON cadangan...', e);
+        }
+      }
+      if (badge) badge.innerText = '📍 Mode Titik Koordinat';
+    }
+
+    function getPolygonFillColor(aktifCount) {
+      if (aktifCount >= 15) return '#1e40af';
+      if (aktifCount >= 5) return '#0284c7';
+      if (aktifCount >= 1) return '#38bdf8';
+      return '#f59e0b';
+    }
+
+    function renderRegionalPolygons() {
+      if (!kaltimGeoJsonData || !DB) return;
+      if (geojsonLayer) map.removeLayer(geojsonLayer);
+      layerByKabName = {};
+
+      geojsonLayer = L.geoJSON(kaltimGeoJsonData, {
+        style: function (feature) {
+          var kabName = matchKabFromGeoProp(feature.properties || {});
+          var kabData = (DB.kabMap && DB.kabMap[kabName]) ? DB.kabMap[kabName] : { sppgBeroperasi: 0 };
+          var isSel = (selectedKab === kabName);
+
+          return {
+            fillColor: getPolygonFillColor(kabData.sppgBeroperasi),
+            weight: isSel ? 3.5 : 1.5,
+            opacity: 1,
+            color: isSel ? '#f59e0b' : '#ffffff',
+            dashArray: isSel ? '' : '3',
+            fillOpacity: isSel ? 0.85 : (selectedKab === 'SEMUA' ? 0.65 : 0.25)
+          };
+        },
+        onEachFeature: function (feature, layer) {
+          var kabName = matchKabFromGeoProp(feature.properties || {});
+          if (!kabName) return;
+          layerByKabName[kabName] = layer;
+
+          var kabData = (DB.kabMap && DB.kabMap[kabName]) ? DB.kabMap[kabName] : {
+            wilayah: kabName, sppgBeroperasi: 0, targetSppg: 0, totalPm: 0, pmSiswa: 0, total3B: 0
+          };
+
+          var tipHtml =
+            '<div>' +
+            '<div style="font-weight:800;font-size:12px;color:#fbbf24;margin-bottom:2px;">' + kabName + '</div>' +
+            '<div>SPPG Beroperasi: <b>' + kabData.sppgBeroperasi + '</b> / ' + kabData.targetSppg + ' Target</div>' +
+            '<div>Total Penerima: <b>' + (kabData.totalPm || 0).toLocaleString('id-ID') + ' PM</b></div>' +
+            '<div style="font-size:10px;color:#bae6fd;margin-top:3px;">Klik wilayah untuk melihat rincian SPPG &rarr;</div>' +
+            '</div>';
+
+          layer.bindTooltip(tipHtml, { sticky: true, className: 'leaflet-tooltip-own' });
+
+          layer.on({
+            mouseover: function (e) {
+              var l = e.target;
+              l.setStyle({ weight: 3, color: '#fbbf24', dashArray: '', fillOpacity: 0.85 });
+              l.bringToFront();
+            },
+            mouseout: function (e) {
+              geojsonLayer.resetStyle(e.target);
+            },
+            click: function () {
+              selectKabupaten(kabName, false);
+            }
+          });
+        }
+      }).addTo(map);
+
+      if (markersLayer) markersLayer.bringToFront();
+    }
+
+    function onDataError(err) {
+      var b = document.getElementById('statusLoadBadge');
+      var msg = err && err.message ? err.message : String(err);
+      if (b) {
+        b.classList.remove('animate-pulse');
+        b.classList.remove('bg-sky-400/20', 'text-sky-200');
+        b.classList.add('bg-rose-600', 'text-white');
+        b.innerText = '⚠️ Gagal Terhubung ke Sheet';
+      }
+
+      var alertBox = document.getElementById('sheetErrorBanner');
+      if (!alertBox) {
+        alertBox = document.createElement('div');
+        alertBox.id = 'sheetErrorBanner';
+        alertBox.className = 'fixed top-16 left-4 right-4 z-50 max-w-2xl mx-auto p-4 bg-rose-50 border-2 border-rose-300 text-rose-900 rounded-2xl shadow-xl flex items-start gap-3 text-xs leading-relaxed animate-fade-up';
+        alertBox.innerHTML =
+          '<span class="text-2xl shrink-0">⚠️</span>' +
+          '<div class="flex-1">' +
+          '<strong class="block text-sm font-bold text-rose-800 mb-1">Gagal Mengambil Data Google Spreadsheet:</strong>' +
+          '<div>' + msg + '</div>' +
+          '<div class="mt-2 p-2 bg-white rounded-lg border border-rose-200 text-slate-700">' +
+          '<b>Cara Mengatasi:</b><br>' +
+          '1. Buka file Google Spreadsheet Anda.<br>' +
+          '2. Klik tombol <b>Bagikan (Share)</b> di pojok kanan atas.<br>' +
+          '3. Ubah Akses Umum menjadi <b>"Siapa saja yang memiliki link" &rarr; "Pelihat (Viewer)"</b>.<br>' +
+          '4. Pastikan tab bernama <code>REKAPITULASI</code> dan <code>KALTIM</code> ada di Spreadsheet tersebut.' +
+          '</div>' +
+          '</div>' +
+          '<button onclick="this.parentElement.remove()" class="text-rose-500 hover:text-rose-800 font-bold text-lg leading-none cursor-pointer">&times;</button>';
+        document.body.appendChild(alertBox);
+      }
+    }
+
+    function onDataLoaded(res) {
+      if (!res) {
+        onDataError({ message: 'Data kosong dari server.' });
+        return;
+      }
+      DB = res;
+      DB.kabList = DB.kabList || [];
+      DB.kabMap = DB.kabMap || {};
+      DB.sppgItems = DB.sppgItems || [];
+
+      var b = document.getElementById('statusLoadBadge');
+      if (b) {
+        b.classList.remove('animate-pulse');
+        b.innerText = '✅ Data Resmi Terhubung';
+      }
+
+      if (res.visitor) {
+        var vTot = document.getElementById('visitorTotalText');
+        var vToday = document.getElementById('visitorTodayText');
+        if (vTot) vTot.innerText = ((res.visitor.total || 1).toLocaleString('id-ID')) + ' Kali';
+        if (vToday) vToday.innerText = (res.visitor.today || 1).toLocaleString('id-ID');
+      }
+
+      renderKabPills();
+      initRekapMitraDropdown();
+      renderRekapKabTable();
+      renderChart();
+      updateDashboardScope();
+      if (kaltimGeoJsonData) renderRegionalPolygons();
+      renderCertTable();
+    }
+
+    // Daftar 16 Rincian Status SPPG sesuai Spreadsheet Resmi BGN (Gambar 1)
+    var DETAILED_STATUS_LIST = [
+      { id: 'ST_01', label: 'Beroperasi', cat: 'BEROPERASI', pillStyle: 'background:#166534;color:#ffffff;' },
+      { id: 'ST_02', label: 'Belum beroperasi', cat: 'BELUM', pillStyle: 'background:#fce7f3;color:#9d174d;border:1px solid #fbcfe8;' },
+      { id: 'ST_03', label: 'Suspend - KF', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_04', label: 'Suspend - Menu tidak layak', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_05', label: 'Suspend - Perbaikan IPAL', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_06', label: 'Suspend - Infrastruktur', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_07', label: 'Suspend - Konflik Internal', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_08', label: 'Suspend - Kendala Lain', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_09', label: 'Suspend - SPS 2', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_10', label: 'Stop Operasional - Pasca Suspen', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_11', label: 'Stop Operasional - Renovasi', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_12', label: 'Stop Operasional - Kendala VA', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_13', label: 'Stop Operasional - Tidak ada Ka SPPG/PG/PK', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_14', label: 'Stop Operasional - Administrasi', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_15', label: 'Stop Operasional - Kendala lain', cat: 'SUSPEND', pillStyle: 'background:#991b1b;color:#ffffff;' },
+      { id: 'ST_16', label: 'Stop Operasional - Karhutla', cat: 'KARHUTLA', pillStyle: 'background:#fde68a;color:#451a03;border:1px solid #fcd34d;' }
+    ];
+
+    function initDetailStatusDropdown() {
+      var listEl = document.getElementById('detailStatusCheckboxList');
+      if (!listEl) return;
+
+      var html = '';
+      for (var i = 0; i < DETAILED_STATUS_LIST.length; i++) {
+        var st = DETAILED_STATUS_LIST[i];
+        html +=
+          '<label class="flex items-center justify-between gap-2 px-2.5 py-1.5 hover:bg-blue-50/70 rounded-lg cursor-pointer select-none transition">' +
+          '<div class="flex items-center gap-2 min-w-0">' +
+          '<input type="checkbox" value="' + st.id + '" data-cat="' + st.cat + '" data-label="' + st.label + '" checked ' +
+          'onchange="onDetailStatusCbChange()" ' +
+          'class="detail-status-cb w-4 h-4 text-bgn-700 rounded focus:ring-bgn-600 cursor-pointer shrink-0">' +
+          '<span style="' + st.pillStyle + 'padding:2px 9px;border-radius:9999px;font-size:11px;font-weight:700;line-height:1.35;" class="truncate">' +
+          st.label +
+          '</span>' +
+          '</div>' +
+          '<span id="det-count-' + st.id + '" class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-extrabold shrink-0">0</span>' +
+          '</label>';
+      }
+      listEl.innerHTML = html;
+      updateDetailDropdownButtonLabel();
+    }
+
+    function toggleDetailStatusDropdown(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      var menu = document.getElementById('detailStatusDropdownMenu');
+      if (menu) menu.classList.toggle('hidden');
+    }
+
+    function getItemDetailedStatusObj(item) {
+      if (item && item._detStatusObj) return item._detStatusObj;
+      var raw = String((item && item.status) || '').trim();
+      var lower = raw.toLowerCase().replace(/\s+/g, ' ');
+
+      for (var i = 0; i < DETAILED_STATUS_LIST.length; i++) {
+        if (DETAILED_STATUS_LIST[i].label.toLowerCase() === lower) {
+          if (item) item._detStatusObj = DETAILED_STATUS_LIST[i];
+          return DETAILED_STATUS_LIST[i];
+        }
+      }
+
+      var matched = DETAILED_STATUS_LIST[1];
+      if (lower.indexOf('karhutla') !== -1 || (item && item.statusCategory === 'KARHUTLA')) {
+        matched = DETAILED_STATUS_LIST[15];
+      } else if (lower.indexOf('kf') !== -1) {
+        matched = DETAILED_STATUS_LIST[2];
+      } else if (lower.indexOf('menu tidak layak') !== -1) {
+        matched = DETAILED_STATUS_LIST[3];
+      } else if (lower.indexOf('ipal') !== -1) {
+        matched = DETAILED_STATUS_LIST[4];
+      } else if (lower.indexOf('infrastruktur') !== -1 || lower.indexOf('insfrastruktur') !== -1) {
+        matched = DETAILED_STATUS_LIST[5];
+      } else if (lower.indexOf('konflik') !== -1) {
+        matched = DETAILED_STATUS_LIST[6];
+      } else if (lower.indexOf('sps') !== -1) {
+        matched = DETAILED_STATUS_LIST[8];
+      } else if (lower.indexOf('pasca') !== -1) {
+        matched = DETAILED_STATUS_LIST[9];
+      } else if (lower.indexOf('renovasi') !== -1) {
+        matched = DETAILED_STATUS_LIST[10];
+      } else if (lower.indexOf('kendala va') !== -1 || lower.indexOf('- va') !== -1) {
+        matched = DETAILED_STATUS_LIST[11];
+      } else if (lower.indexOf('tidak ada ka') !== -1 || lower.indexOf('pg/pk') !== -1) {
+        matched = DETAILED_STATUS_LIST[12];
+      } else if (lower.indexOf('administrasi') !== -1) {
+        matched = DETAILED_STATUS_LIST[13];
+      } else if (lower.indexOf('stop') !== -1) {
+        matched = DETAILED_STATUS_LIST[14];
+      } else if (lower.indexOf('suspend') !== -1 || (item && item.statusCategory === 'SUSPEND')) {
+        matched = DETAILED_STATUS_LIST[7];
+      } else if (lower.indexOf('beroperasi') !== -1 && lower.indexOf('belum') === -1) {
+        matched = DETAILED_STATUS_LIST[0];
+      }
+
+      if (item) item._detStatusObj = matched;
+      return matched;
+    }
+
+    function getSppgStatusCategory(item) {
+      var detObj = getItemDetailedStatusObj(item);
+      return detObj ? detObj.cat : 'BELUM';
+    }
+
+    function getCheckedStatuses() {
+      var checkboxes = document.querySelectorAll('.sppg-status-cb:checked');
+      return Array.from(checkboxes).map(function (cb) { return cb.value; });
+    }
+
+    function getCheckedDetailedIds() {
+      var cbs = document.querySelectorAll('.detail-status-cb:checked');
+      return Array.from(cbs).map(function (cb) { return cb.value; });
+    }
+
+    function isItemStatusChecked(item) {
+      var detCbs = document.querySelectorAll('.detail-status-cb');
+      if (detCbs.length > 0) {
+        var detObj = getItemDetailedStatusObj(item);
+        var checkedIds = getCheckedDetailedIds();
+        return checkedIds.indexOf(detObj.id) !== -1;
+      }
+      var checkedCats = getCheckedStatuses();
+      return checkedCats.indexOf(getSppgStatusCategory(item)) !== -1;
+    }
+
+    function updateDetailDropdownButtonLabel() {
+      var btnLabel = document.getElementById('detailStatusDropdownLabel');
+      if (!btnLabel) return;
+      var allCbs = document.querySelectorAll('.detail-status-cb');
+      var checkedCbs = document.querySelectorAll('.detail-status-cb:checked');
+      var total = allCbs.length || 16;
+      var count = checkedCbs.length;
+
+      if (count === total) {
+        btnLabel.innerText = '☑️ Semua Status SPPG (' + total + ')';
+      } else if (count === 0) {
+        btnLabel.innerText = '⬜ Pilih Status SPPG (0)';
+      } else if (count === 1) {
+        btnLabel.innerText = '☑️ ' + (checkedCbs[0].getAttribute('data-label') || '1 Status');
+      } else {
+        btnLabel.innerText = '☑️ ' + count + ' Status SPPG Dipilih';
+      }
+    }
+
+    function syncTopCheckboxesFromDetail() {
+      var topCbs = document.querySelectorAll('.sppg-status-cb');
+      topCbs.forEach(function (topCb) {
+        var cat = topCb.value;
+        var anyChecked = false;
+        document.querySelectorAll('.detail-status-cb').forEach(function (detCb) {
+          if (detCb.getAttribute('data-cat') === cat && detCb.checked) {
+            anyChecked = true;
+          }
+        });
+        topCb.checked = anyChecked;
+      });
+    }
+
+    function onDetailStatusCbChange() {
+      syncTopCheckboxesFromDetail();
+      updateDetailDropdownButtonLabel();
+      updateCheckboxCalculator();
+      renderMapMarkers();
+      renderSppgTable();
+    }
+
+    function setDetailStatusQuick(mode) {
+      document.querySelectorAll('.detail-status-cb').forEach(function (detCb) {
+        var cat = detCb.getAttribute('data-cat');
+        if (mode === 'ALL') {
+          detCb.checked = true;
+        } else if (mode === 'NONE') {
+          detCb.checked = false;
+        } else if (mode === 'STOP_ONLY') {
+          detCb.checked = (cat === 'SUSPEND' || cat === 'KARHUTLA');
+        }
+      });
+      syncTopCheckboxesFromDetail();
+      updateDetailDropdownButtonLabel();
+      updateCheckboxCalculator();
+      renderMapMarkers();
+      renderSppgTable();
+    }
+
+    function setAllStatusCheckboxes(checkedState) {
+      document.querySelectorAll('.sppg-status-cb').forEach(function (cb) {
+        cb.checked = checkedState;
+      });
+      document.querySelectorAll('.detail-status-cb').forEach(function (detCb) {
+        detCb.checked = checkedState;
+      });
+      updateDetailDropdownButtonLabel();
+      updateCheckboxCalculator();
+      renderMapMarkers();
+      renderSppgTable();
+    }
+
+    function setOnlyStopCheckboxes() {
+      document.querySelectorAll('.sppg-status-cb').forEach(function (cb) {
+        cb.checked = (cb.value === 'SUSPEND' || cb.value === 'KARHUTLA');
+      });
+      document.querySelectorAll('.detail-status-cb').forEach(function (detCb) {
+        var cat = detCb.getAttribute('data-cat');
+        detCb.checked = (cat === 'SUSPEND' || cat === 'KARHUTLA');
+      });
+      updateDetailDropdownButtonLabel();
+      updateCheckboxCalculator();
+      renderMapMarkers();
+      renderSppgTable();
+    }
+
+    function onStatusCheckboxChange(changedCb) {
+      if (changedCb && changedCb.value) {
+        var targetCat = changedCb.value;
+        var targetState = changedCb.checked;
+        document.querySelectorAll('.detail-status-cb').forEach(function (detCb) {
+          if (detCb.getAttribute('data-cat') === targetCat) {
+            detCb.checked = targetState;
+          }
+        });
+      } else {
+        var checkedCats = getCheckedStatuses();
+        document.querySelectorAll('.detail-status-cb').forEach(function (detCb) {
+          detCb.checked = checkedCats.indexOf(detCb.getAttribute('data-cat')) !== -1;
+        });
+      }
+      updateDetailDropdownButtonLabel();
+      updateCheckboxCalculator();
+      renderMapMarkers();
+      renderSppgTable();
+    }
+
+    /**
+     * FUNGSI: updateCheckboxCalculator()
+     * ------------------------------------------------------------------------
+     * Menghitung secara otomatis total gabungan Unit SPPG dan Penerima Manfaat (PM)
+     * sesuai dengan kotak ceklis status operasional yang dicentang oleh pengguna.
+     */
+    function updateCheckboxCalculator() {
+      if (!DB) return;
+
+      var listInScope = (selectedKab === 'SEMUA')
+        ? DB.sppgItems
+        : DB.sppgItems.filter(function (x) { return x.kabupaten === selectedKab; });
+
+      var counts = { BEROPERASI: 0, BELUM: 0, SUSPEND: 0, KARHUTLA: 0 };
+      var detCounts = {};
+      for (var d = 0; d < DETAILED_STATUS_LIST.length; d++) {
+        detCounts[DETAILED_STATUS_LIST[d].id] = 0;
+      }
+
+      var totalCheckedSppg = 0;
+      var totalCheckedPm = 0;
+
+      listInScope.forEach(function (item) {
+        var detObj = getItemDetailedStatusObj(item);
+        var cat = detObj.cat;
+        if (counts[cat] !== undefined) counts[cat]++;
+        if (detCounts[detObj.id] !== undefined) detCounts[detObj.id]++;
+
+        if (isItemStatusChecked(item)) {
+          totalCheckedSppg++;
+          totalCheckedPm += (item.totalPm || 0);
+        }
+      });
+
+      Object.keys(counts).forEach(function (k) {
+        var el = document.getElementById('cb-count-' + k);
+        if (el) el.innerText = counts[k].toLocaleString('id-ID');
+      });
+
+      Object.keys(detCounts).forEach(function (detId) {
+        var detEl = document.getElementById('det-count-' + detId);
+        if (detEl) detEl.innerText = detCounts[detId].toLocaleString('id-ID');
+      });
+
+      var checkedDetCbs = document.querySelectorAll('.detail-status-cb:checked');
+      var allDetCbs = document.querySelectorAll('.detail-status-cb');
+      var sumTextEl = document.getElementById('checkedSummaryText');
+
+      if (sumTextEl) {
+        if (checkedDetCbs.length === 0) {
+          sumTextEl.innerText = 'Tidak ada status yang dicentang (Silakan centang minimal 1 status)';
+        } else if (checkedDetCbs.length === allDetCbs.length) {
+          sumTextEl.innerText = 'Semua Status Operasional (' + allDetCbs.length + ' Rincian Status)';
+        } else if (checkedDetCbs.length <= 3) {
+          var names = Array.from(checkedDetCbs).map(function (c) { return c.getAttribute('data-label'); });
+          sumTextEl.innerText = 'Status terpilih: ' + names.join(' + ');
+        } else {
+          sumTextEl.innerText = checkedDetCbs.length + ' Rincian Status SPPG Digabung';
+        }
+      }
+
+      document.getElementById('checkedTotalSppg').innerText = totalCheckedSppg.toLocaleString('id-ID') + ' Unit';
+      document.getElementById('checkedTotalPm').innerText = totalCheckedPm.toLocaleString('id-ID') + ' PM';
+
+      var dataRef = (selectedKab === 'SEMUA') ? DB.provTotal : (DB.kabMap[selectedKab] || DB.provTotal);
+      if (allDetCbs.length > 0 && checkedDetCbs.length < allDetCbs.length) {
+        animateNumber('kpi-sppg-total', totalCheckedSppg);
+        document.getElementById('kpi-sppg-status-sub').innerText = 'Hasil Ceklis (' + checkedDetCbs.length + ' Status Rinci Terpilih)';
+      } else {
+        animateNumber('kpi-sppg-total', dataRef.totalSppg);
+        document.getElementById('kpi-sppg-status-sub').innerText =
+          'Operasional: ' + counts.BEROPERASI +
+          ' | Persiapan: ' + counts.BELUM +
+          ' | Suspend/Stop: ' + counts.SUSPEND +
+          ' | Karhutla: ' + counts.KARHUTLA;
+      }
+    }
+
+    function renderKabPills() {
+      var container = document.getElementById('kabPillsContainer');
+      if (!container || !DB) return;
+      var totalUnitCount = DB.sppgItems.length;
+
+      var html =
+        '<button onclick="selectKabupaten(\'SEMUA\')" id="pill-SEMUA" ' +
+        'class="kab-pill active shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">' +
+        '<span>🌐 Seluruh Kaltim</span>' +
+        '<span class="px-1.5 py-0.2 bg-white/20 rounded-full text-[10px]">' + totalUnitCount + '</span>' +
+        '</button>';
+
+      DB.kabList.forEach(function (k) {
+        var unitCount = DB.sppgItems.filter(function (s) { return s.kabupaten === k.wilayah; }).length;
+        html +=
+          '<button onclick="selectKabupaten(\'' + k.wilayah + '\')" id="pill-' + k.wilayah + '" ' +
+          'class="kab-pill shrink-0 px-3 py-1.5 rounded-full border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5 cursor-pointer">' +
+          '<span>' + k.wilayah + '</span>' +
+          '<span class="px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full text-[10px] font-bold">' + unitCount + '</span>' +
+          '</button>';
+      });
+
+      container.innerHTML = html;
+    }
+
+    /**
+     * FUNGSI: selectKabupaten(kabName, scrollToSppg)
+     * ------------------------------------------------------------------------
+     * Mengubah cakupan wilayah aktif (Seluruh Kaltim atau salah satu dari 10 Kab/Kota),
+     * menggerakkan zoom peta ke wilayah tersebut, dan memperbarui seluruh angka KPI & tabel.
+     */
+    function selectKabupaten(kabName, scrollToSppg) {
+      if (!DB) return;
+      selectedKab = kabName;
+      var sideSelect = document.getElementById('sidebarKabSelect');
+      if (sideSelect && sideSelect.value !== kabName) {
+        sideSelect.value = kabName;
+      }
+      var sideBadge = document.getElementById('sidebarScopeBadge');
+      if (sideBadge) {
+        sideBadge.innerText = (kabName === 'SEMUA') ? '10 Kab/Kota' : '1 Wilayah';
+      }
+
+      document.querySelectorAll('.kab-pill').forEach(function (el) { el.classList.remove('active'); });
+      var activePill = document.getElementById('pill-' + kabName);
+      if (activePill) activePill.classList.add('active');
+
+      var btnReset = document.getElementById('btnResetKab');
+      if (kabName === 'SEMUA') {
+        if (btnReset) btnReset.classList.add('hidden');
+        if (geojsonLayer) {
+          map.fitBounds(geojsonLayer.getBounds(), { padding: [15, 15] });
+        } else {
+          map.setView([0.45, 116.4], 6.5);
+        }
+      } else {
+        if (btnReset) btnReset.classList.remove('hidden');
+        if (layerByKabName[kabName]) {
+          map.fitBounds(layerByKabName[kabName].getBounds(), { padding: [30, 30], maxZoom: 10 });
+        } else if (DB.kabMap && DB.kabMap[kabName]) {
+          map.setView([DB.kabMap[kabName].lat, DB.kabMap[kabName].lng], 9);
+        }
+      }
+
+      updateDashboardScope();
+      renderRekapKabTable();
+      if (kaltimGeoJsonData) renderRegionalPolygons();
+      renderCertTable();
+
+      if (scrollToSppg) {
+        if (currentPageId !== 'direktori') {
+          switchPage('direktori');
+        }
+        setTimeout(function () {
+          var sec = document.getElementById('sppgSection');
+          if (sec) sec.scrollIntoView({ behavior: 'smooth' });
+        }, 120);
+      }
+    }
+
+    var _animTimers = {};
+    function animateNumber(elId, targetVal) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      var end = Number(targetVal) || 0;
+      if (_animTimers[elId]) cancelAnimationFrame(_animTimers[elId]);
+
+      var startRaw = parseInt(String(el.innerText || '0').replace(/[^0-9]/g, ''), 10);
+      var start = isNaN(startRaw) ? 0 : startRaw;
+      if (start === end) {
+        el.innerText = end.toLocaleString('id-ID');
+        return;
+      }
+
+      var duration = 420;
+      var startTime = performance.now();
+      function step(now) {
+        var progress = Math.min((now - startTime) / duration, 1);
+        var eased = 1 - Math.pow(1 - progress, 3);
+        var current = Math.round(start + (end - start) * eased);
+        el.innerText = current.toLocaleString('id-ID');
+        if (progress < 1) {
+          _animTimers[elId] = requestAnimationFrame(step);
+        } else {
+          el.innerText = end.toLocaleString('id-ID');
+        }
+      }
+      _animTimers[elId] = requestAnimationFrame(step);
+    }
+
+    /**
+     * FUNGSI: updateDashboardScope()
+     * ------------------------------------------------------------------------
+     * Memperbarui 5 Kartu KPI Utama dan 4 kotak indikator sertifikasi di bagian atas
+     * menggunakan data resmi dari Sheet "REKAPITULASI" (DB.provTotal atau DB.kabMap).
+     */
+    function updateDashboardScope() {
+      if (!DB || !DB.provTotal) return;
+      var dataRef = (selectedKab === 'SEMUA') ? DB.provTotal : (DB.kabMap[selectedKab] || DB.provTotal);
+
+      document.getElementById('activeScopeBadge').innerText = (selectedKab === 'SEMUA') ? 'CAKUPAN PROVINSI' : 'CAKUPAN KABUPATEN / KOTA';
+      document.getElementById('activeRegionTitle').innerText = (selectedKab === 'SEMUA')
+        ? 'PROVINSI KALIMANTAN TIMUR (10 KABUPATEN/KOTA)'
+        : dataRef.wilayah;
+
+      var pctTarget = dataRef.targetSppg > 0 ? ((dataRef.sppgBeroperasi / dataRef.targetSppg) * 100).toFixed(1) : 0;
+
+      animateNumber('kpi-sppg-aktif', dataRef.sppgBeroperasi);
+      document.getElementById('kpi-sppg-target').innerText =
+        'Dari Target: ' + (dataRef.targetSppg || 0).toLocaleString('id-ID') + ' Unit (' + pctTarget + '%)';
+
+      animateNumber('kpi-total-pm', dataRef.totalPm);
+      document.getElementById('kpi-potensi-pm').innerText =
+        'Potensi Sasaran: ' + (dataRef.potTotal || 0).toLocaleString('id-ID');
+
+      animateNumber('kpi-pm-siswa', dataRef.pmSiswa);
+      document.getElementById('kpi-pm-tendik').innerText =
+        '+ Pendidik & Tendik: ' + ((dataRef.pmTendik || 0) + (dataRef.pmNonTendik || 0)).toLocaleString('id-ID');
+
+      animateNumber('kpi-pm-3b', dataRef.total3B);
+      document.getElementById('kpi-pm-3b-sub').innerText =
+        'Balita: ' + (dataRef.pmBalita || 0).toLocaleString('id-ID') +
+        ' | Bumil Busui: ' + ((dataRef.pmBumil || 0) + (dataRef.pmBusui || 0)).toLocaleString('id-ID');
+
+      document.getElementById('kpi-cert-bpjs').innerText = (dataRef.bpjsSudah || 0) + ' SPPG';
+      document.getElementById('kpi-cert-slhs').innerText = (dataRef.slhsSudah || 0) + ' SPPG';
+      document.getElementById('kpi-cert-halal').innerText = (dataRef.halalSudah || 0) + ' SPPG';
+      document.getElementById('kpi-cert-chef').innerText = (dataRef.chefSudah || 0) + ' SPPG';
+
+      updateCheckboxCalculator();
+      renderMapMarkers();
+      renderSppgTable();
+    }
+
+    // =========================================================================
+    // DATABASE KOORDINAT 105 KECAMATAN SE-KALIMANTAN TIMUR & PARSER LOKASI SPPG
+    // =========================================================================
+    var mapMarkerMode = 'KEC';
+
+    var KEC_COORDS = {
+      'KOTA BALIKPAPAN': {
+        'Balikpapan Selatan': [-1.2530, 116.8830],
+        'Balikpapan Tengah': [-1.2545, 116.8425],
+        'Balikpapan Utara': [-1.2020, 116.8620],
+        'Balikpapan Barat': [-1.2150, 116.8180],
+        'Balikpapan Timur': [-1.2180, 116.9550],
+        'Balikpapan Kota': [-1.2755, 116.8325]
+      },
+      'KOTA SAMARINDA': {
+        'Samarinda Seberang': [-0.5210, 117.1390],
+        'Samarinda Utara': [-0.4380, 117.1750],
+        'Samarinda Kota': [-0.5015, 117.1480],
+        'Samarinda Ilir': [-0.5060, 117.1630],
+        'Samarinda Ulu': [-0.4830, 117.1330],
+        'Loa Janan Ilir': [-0.5560, 117.1180],
+        'Sungai Kunjang': [-0.5170, 117.1050],
+        'Sungai Pinang': [-0.4710, 117.1660],
+        'Sambutan': [-0.5220, 117.1950],
+        'Palaran': [-0.5750, 117.1850]
+      },
+      'KOTA BONTANG': {
+        'Bontang Selatan': [0.1080, 117.4820],
+        'Bontang Utara': [0.1480, 117.4880],
+        'Bontang Barat': [0.1360, 117.4520]
+      },
+      'PENAJAM PASER UTARA': {
+        'Penajam': [-1.2630, 116.7450],
+        'Babulu': [-1.5050, 116.4420],
+        'Sepaku': [-0.9650, 116.7850],
+        'Waru': [-1.3780, 116.6120]
+      },
+      'PASER': {
+        'Pasir Belengkong': [-1.9750, 116.2450],
+        'Tanjung Harapan': [-2.2350, 116.4250],
+        'Tanah Grogot': [-1.9060, 116.1970],
+        'Muara Komam': [-1.6750, 115.7550],
+        'Batu Sopang': [-1.8150, 115.8850],
+        'Batu Engau': [-2.1150, 116.2250],
+        'Muara Samu': [-2.0350, 115.9650],
+        'Long Ikis': [-1.5850, 116.1850],
+        'Long Kali': [-1.4520, 116.2950],
+        'Kuaro': [-1.7620, 116.1420]
+      },
+      'KUTAI KARTANEGARA': {
+        'Tenggarong Seberang': [-0.3850, 117.0750],
+        'Kota Bangun Darat': [-0.3150, 116.5850],
+        'Kembang Janggut': [0.1650, 116.3650],
+        'Samboja Barat': [-0.9950, 116.9650],
+        'Muara Muntai': [-0.3550, 116.3850],
+        'Sanga Sanga': [-0.6550, 117.2450],
+        'Kota Bangun': [-0.2350, 116.5950],
+        'Marang Kayu': [-0.0850, 117.4250],
+        'Muara Badak': [-0.3150, 117.4150],
+        'Muara Kaman': [-0.1450, 116.7150],
+        'Tenggarong': [-0.4150, 116.9850],
+        'Muara Jawa': [-0.8250, 117.2250],
+        'Loa Janan': [-0.5850, 117.0650],
+        'Muara Wis': [-0.2150, 116.4450],
+        'Loa Kulu': [-0.5250, 117.0150],
+        'Samboja': [-1.0150, 117.0850],
+        'Anggana': [-0.5350, 117.2850],
+        'Kenohan': [-0.0850, 116.4350],
+        'Sebulu': [-0.2750, 117.0250],
+        'Tabang': [0.5650, 116.0250]
+      },
+      'KUTAI TIMUR': {
+        'Sangatta Selatan': [0.4450, 117.5250],
+        'Sangatta Utara': [0.5150, 117.5350],
+        'Muara Ancalong': [0.4550, 116.6550],
+        'Muara Bengkal': [0.4250, 116.7450],
+        'Long Mesangat': [0.5850, 116.7650],
+        'Rantau Pulung': [0.6350, 117.3450],
+        'Teluk Pandan': [0.2450, 117.4650],
+        'Sangkulirang': [0.9950, 117.9650],
+        'Muara Wahau': [1.0850, 116.8650],
+        'Batu Ampar': [0.5550, 116.9250],
+        'Kaliorang': [0.8350, 117.8450],
+        'Karangan': [1.2650, 117.6850],
+        'Bengalon': [0.7650, 117.5550],
+        'Sandaran': [1.1250, 118.4250],
+        'Kombeng': [1.0350, 116.9550],
+        'Kaubun': [0.9750, 117.7550],
+        'Busang': [0.7850, 116.4850],
+        'Telen': [0.8750, 116.7950]
+      },
+      'KUTAI BARAT': {
+        'Mook Manaar Bulatn': [-0.1850, 115.8950],
+        'Linggang Bigung': [-0.1450, 115.6350],
+        'Barong Tongkok': [-0.2350, 115.6920],
+        'Bentian Besar': [-0.6450, 115.5850],
+        'Sekolaq Darat': [-0.2750, 115.7650],
+        'Penyinggahan': [-0.2950, 116.1750],
+        'Siluq Ngurai': [-0.5150, 115.9250],
+        'Muara Pahu': [-0.3150, 116.0550],
+        'Muara Lawa': [-0.4450, 115.7750],
+        'Long Iram': [-0.0150, 115.5650],
+        'Jempang': [-0.4750, 116.1650],
+        'Nyuatan': [-0.3650, 115.5150],
+        'Bongan': [-0.6650, 116.1950],
+        'Tering': [-0.0750, 115.6150],
+        'Damai': [-0.4350, 115.6250],
+        'Melak': [-0.2420, 115.8250]
+      },
+      'BERAU': {
+        'Pulau Derawan': [2.2850, 118.2420],
+        'Tanjung Redeb': [2.1520, 117.4950],
+        'Gunung Tabur': [2.1850, 117.4750],
+        'Teluk Bayur': [2.1380, 117.4320],
+        'Biduk Biduk': [1.2550, 118.6850],
+        'Sambaliung': [2.1150, 117.5250],
+        'Batu Putih': [1.3950, 118.4250],
+        'Talisayan': [1.5950, 118.1450],
+        'Maratua': [2.2150, 118.5850],
+        'Tabalar': [1.8250, 117.7850],
+        'Biatan': [1.6650, 117.9250],
+        'Segah': [2.1650, 117.1250],
+        'Kelay': [1.7650, 117.1850]
+      },
+      'MAHAKAM ULU': {
+        'Long Pahangai': [0.8450, 114.8650],
+        'Long Hubung': [0.3850, 115.3950],
+        'Long Bagun': [0.5620, 115.2350],
+        'Long Apari': [1.0650, 114.4850],
+        'Laham': [0.2750, 115.3250]
+      }
+    };
+
+    function parseGoogleMapsField(rawInput) {
+      var str = String(rawInput || '').trim();
+      if (!str || str === '-') {
+        return { hasLink: false, hasGps: false, lat: null, lng: null, url: '' };
+      }
+
+      var lat = null;
+      var lng = null;
+
+      try {
+        if (str.indexOf('!3d') !== -1 && str.indexOf('!4d') !== -1) {
+          var pLat = str.split('!3d')[1].split('!4d')[0];
+          var pLng = str.split('!4d')[1].split('!')[0].split('?')[0].split('&')[0];
+          lat = parseFloat(pLat);
+          lng = parseFloat(pLng);
+        } else if (str.indexOf('@') !== -1) {
+          var afterAt = str.split('@')[1];
+          var parts = afterAt.split(',');
+          if (parts.length >= 2) {
+            lat = parseFloat(parts[0]);
+            lng = parseFloat(parts[1]);
+          }
+        } else if (str.indexOf(',') !== -1) {
+          var cleaned = str.replace(/[^0-9.,-]/g, '');
+          var cParts = cleaned.split(',');
+          if (cParts.length === 2) {
+            lat = parseFloat(cParts[0]);
+            lng = parseFloat(cParts[1]);
+          }
+        }
+      } catch (err) { }
+
+      var hasGps = (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180);
+      var url = str;
+      if (str.indexOf('http://') !== 0 && str.indexOf('https://') !== 0) {
+        url = hasGps
+          ? ('https://www.google.com/maps?q=' + lat + ',' + lng)
+          : ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(str));
+      }
+
+      return {
+        hasLink: true,
+        hasGps: hasGps,
+        lat: hasGps ? lat : null,
+        lng: hasGps ? lng : null,
+        url: url
+      };
+    }
+
+    function parseSppgLocation(item) {
+      if (item._parsedLoc) return item._parsedLoc;
+
+      var kab = String(item.kabupaten || '').toUpperCase().trim();
+      var rawName = String(item.namaSppg || '').trim();
+      var lowerName = rawName.toLowerCase();
+      var id = String(item.idSppg || '').toUpperCase().trim();
+      var gmapsInfo = parseGoogleMapsField(item.gmapsUrl);
+
+      if (lowerName.indexOf('mabes polri 7') !== -1 || id === 'NB6IYSSW') {
+        item._parsedLoc = {
+          kabupaten: 'KUTAI BARAT',
+          kecamatan: 'Barong Tongkok',
+          kelurahan: 'Polres Kutai Barat',
+          noAntrian: '7',
+          baseLat: gmapsInfo.hasGps ? gmapsInfo.lat : -0.2350,
+          baseLng: gmapsInfo.hasGps ? gmapsInfo.lng : 115.6920,
+          hasExactGps: gmapsInfo.hasGps,
+          hasGmapsLink: gmapsInfo.hasLink,
+          gmapsUrl: gmapsInfo.url
+        };
+        return item._parsedLoc;
+      }
+
+      if (lowerName.indexOf('mabes polri 8') !== -1 || id === 'P4BZ7DAM') {
+        item._parsedLoc = {
+          kabupaten: 'KOTA BALIKPAPAN',
+          kecamatan: 'Balikpapan Selatan',
+          kelurahan: 'Polda Kaltim',
+          noAntrian: '8',
+          baseLat: gmapsInfo.hasGps ? gmapsInfo.lat : -1.2530,
+          baseLng: gmapsInfo.hasGps ? gmapsInfo.lng : 116.8830,
+          hasExactGps: gmapsInfo.hasGps,
+          hasGmapsLink: gmapsInfo.hasLink,
+          gmapsUrl: gmapsInfo.url
+        };
+        return item._parsedLoc;
+      }
+
+      var kabDict = KEC_COORDS[kab] || {};
+      var kecNames = Object.keys(kabDict).sort(function (a, b) { return b.length - a.length; });
+
+      var rem = rawName.replace(/^SPPG\s+/i, '').trim();
+      rem = rem.replace(/^(?:Kabupaten\s+|Kab\.\s*)/i, '').trim();
+      if (kab && rem.toUpperCase().indexOf(kab) === 0) {
+        rem = rem.substring(kab.length).trim();
+      }
+
+      var matchedKec = '';
+      var afterKec = rem;
+
+      for (var i = 0; i < kecNames.length; i++) {
+        var kec = kecNames[i];
+        var remLower = rem.toLowerCase();
+        var kecLower = kec.toLowerCase();
+        if (remLower.indexOf(kecLower) === 0) {
+          matchedKec = kec;
+          afterKec = rem.substring(kec.length).trim();
+          break;
+        }
+      }
+
+      if (!matchedKec) {
+        for (var j = 0; j < kecNames.length; j++) {
+          var kec2 = kecNames[j];
+          var idx = rem.toLowerCase().indexOf(kec2.toLowerCase());
+          if (idx !== -1) {
+            matchedKec = kec2;
+            afterKec = rem.substring(idx + kec2.length).trim();
+            break;
+          }
+        }
+      }
+
+      var kelurahan = afterKec || '-';
+      var noAntrian = '1';
+      var partsAfter = afterKec.split(/\s+/);
+      if (partsAfter.length > 1) {
+        var lastToken = partsAfter[partsAfter.length - 1];
+        if (/^\d+$/.test(lastToken)) {
+          noAntrian = lastToken;
+          partsAfter.pop();
+          kelurahan = partsAfter.join(' ').trim() || afterKec;
+        }
+      }
+
+      var kabFallback = (DB && DB.kabMap && DB.kabMap[kab])
+        ? [DB.kabMap[kab].lat, DB.kabMap[kab].lng]
+        : [-0.50, 117.15];
+      var coords = (matchedKec && kabDict[matchedKec]) ? kabDict[matchedKec] : kabFallback;
+
+      item._parsedLoc = {
+        kabupaten: kab,
+        kecamatan: matchedKec || 'Pusat Wilayah',
+        kelurahan: kelurahan || '-',
+        noAntrian: noAntrian,
+        baseLat: gmapsInfo.hasGps ? gmapsInfo.lat : coords[0],
+        baseLng: gmapsInfo.hasGps ? gmapsInfo.lng : coords[1],
+        hasExactGps: gmapsInfo.hasGps,
+        hasGmapsLink: gmapsInfo.hasLink,
+        gmapsUrl: gmapsInfo.url
+      };
+      return item._parsedLoc;
+    }
+
+    function setMapMarkerMode(mode) {
+      mapMarkerMode = mode;
+      ['KEC', 'UNIT', 'KAB'].forEach(function (m) {
+        var btn = document.getElementById('btnMapMode-' + m);
+        if (!btn) return;
+        if (m === mode) {
+          btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition bg-bgn-800 text-white shadow-2xs cursor-pointer';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold transition text-slate-600 hover:text-bgn-900 cursor-pointer';
+        }
+      });
+      renderMapMarkers();
+    }
+
+    function filterTableByKecamatan(kabName, kecName) {
+      if (kabName && selectedKab !== kabName) {
+        selectKabupaten(kabName, false);
+      }
+      var searchInput = document.getElementById('sppgSearchInput');
+      if (searchInput) {
+        searchInput.value = kecName;
+      }
+      renderSppgTable();
+      document.getElementById('sppgSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function openPublicModalById(idSppg) {
+      if (!DB || !DB.sppgItems) return;
+      var item = DB.sppgItems.find(function (x) { return String(x.idSppg) === String(idSppg); });
+      if (item) {
+        openPublicModalItem(item);
+      }
+    }
+
+    function renderMapMarkers() {
+      if (!markersLayer || !DB) return;
+      markersLayer.clearLayers();
+
+      var checkedStatuses = getCheckedStatuses();
+      var counterEl = document.getElementById('mapActiveCounterText');
+
+      // MODE 1: PER KABUPATEN/KOTA (10 TITIK)
+      if (mapMarkerMode === 'KAB') {
+        if (counterEl) {
+          counterEl.innerHTML = '🏛️ Menampilkan <b>' + DB.kabList.length + ' Titik Kabupaten/Kota</b> se-Kalimantan Timur';
+        }
+        DB.kabList.forEach(function (item) {
+          var isSelected = (selectedKab === item.wilayah);
+          var color = item.sppgBeroperasi >= 15 ? '#0a2558' : (item.sppgBeroperasi > 0 ? '#10b981' : '#f59e0b');
+
+          var marker = L.circleMarker([item.lat, item.lng], {
+            radius: isSelected ? 11 : 8,
+            fillColor: color,
+            color: '#ffffff',
+            weight: isSelected ? 3 : 2,
+            fillOpacity: 1
+          });
+
+          var popupHtml =
+            '<div style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:12px;line-height:1.45;min-width:200px;">' +
+            '<strong style="color:#0a2558;font-size:13px;">' + item.wilayah + '</strong>' +
+            '<hr style="margin:4px 0;"/>' +
+            '<b>SPPG Beroperasi:</b> ' + item.sppgBeroperasi + ' dari ' + item.targetSppg + ' Target<br/>' +
+            '<b>Total Penerima Manfaat:</b> ' + (item.totalPm || 0).toLocaleString('id-ID') + ' PM<br/>' +
+            '<b>Siswa:</b> ' + (item.pmSiswa || 0).toLocaleString('id-ID') + ' | <b>3B:</b> ' + (item.total3B || 0).toLocaleString('id-ID') + '<br/>' +
+            '<button onclick="selectKabupaten(\'' + item.wilayah + '\', true)" ' +
+            'style="margin-top:6px;width:100%;background:#0a2558;color:#fff;border:none;padding:5px 8px;border-radius:6px;font-weight:bold;cursor:pointer;">' +
+            'Lihat Daftar SPPG &rarr;' +
+            '</button>' +
+            '</div>';
+
+          marker.bindPopup(popupHtml);
+          markersLayer.addLayer(marker);
+        });
+        return;
+      }
+
+      // Filter item SPPG sesuai Kabupaten aktif & Ceklis Status Rinci
+      var activeItems = DB.sppgItems.filter(function (item) {
+        var matchKab = (selectedKab === 'SEMUA') || (item.kabupaten === selectedKab);
+        return matchKab && isItemStatusChecked(item);
+      });
+
+      // MODE 2: PER KECAMATAN (RINGKASAN KLUSTER KECAMATAN)
+      if (mapMarkerMode === 'KEC') {
+        var kecGroups = {};
+        activeItems.forEach(function (item) {
+          var loc = parseSppgLocation(item);
+          var key = loc.kabupaten + '|' + loc.kecamatan;
+          if (!kecGroups[key]) {
+            kecGroups[key] = {
+              kabupaten: loc.kabupaten,
+              kecamatan: loc.kecamatan,
+              lat: loc.baseLat,
+              lng: loc.baseLng,
+              items: [],
+              counts: { BEROPERASI: 0, BELUM: 0, SUSPEND: 0, KARHUTLA: 0 },
+              totalPm: 0
+            };
+          }
+          var g = kecGroups[key];
+          g.items.push({ item: item, loc: loc });
+          var cat = getSppgStatusCategory(item);
+          if (g.counts[cat] !== undefined) g.counts[cat]++;
+          g.totalPm += (item.totalPm || 0);
+        });
+
+        var groupList = Object.keys(kecGroups).map(function (k) { return kecGroups[k]; });
+        if (counterEl) {
+          counterEl.innerHTML = '📍 Menampilkan <b>' + groupList.length + ' Titik Kecamatan</b> (' + activeItems.length + ' Unit SPPG)';
+        }
+
+        groupList.forEach(function (g) {
+          var bgColor = '#64748b';
+          if (g.counts.BEROPERASI > 0) bgColor = '#10b981';
+          else if (g.counts.KARHUTLA > 0) bgColor = '#ea580c';
+          else if (g.counts.SUSPEND > 0) bgColor = '#f59e0b';
+
+          var size = g.items.length >= 10 ? 30 : (g.items.length >= 4 ? 26 : 22);
+          var iconHtml =
+            '<div style="width:' + size + 'px;height:' + size + 'px;background:' + bgColor + ';color:#fff;border:2px solid #fff;' +
+            'border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;' +
+            'box-shadow:0 2px 6px rgba(15,23,42,0.35);font-family:\'Plus Jakarta Sans\',sans-serif;">' +
+            g.items.length + '</div>';
+
+          var icon = L.divIcon({
+            className: '',
+            html: iconHtml,
+            iconSize: [size, size],
+            iconAnchor: [size / 2, size / 2]
+          });
+
+          var marker = L.marker([g.lat, g.lng], { icon: icon });
+
+          var tipKec =
+            '<div>' +
+            '<div style="font-weight:800;color:#fbbf24;">Kec. ' + g.kecamatan + '</div>' +
+            '<div style="font-size:10px;color:#e2e8f0;">' + g.kabupaten + '</div>' +
+            '<div style="margin-top:2px;">Total: <b>' + g.items.length + ' SPPG</b> (' + g.counts.BEROPERASI + ' Aktif)</div>' +
+            '<div>Penerima: <b>' + g.totalPm.toLocaleString('id-ID') + ' PM</b></div>' +
+            '</div>';
+
+          marker.bindTooltip(tipKec, { direction: 'top', offset: [0, -10], className: 'leaflet-tooltip-own' });
+
+          var listHtml = g.items.map(function (entry) {
+            var item = entry.item;
+            var loc = entry.loc;
+            var cat = getSppgStatusCategory(item);
+            var dot = cat === 'BEROPERASI' ? '🟢' : (cat === 'KARHUTLA' ? '🔴' : (cat === 'SUSPEND' ? '🟡' : '⚪'));
+            return (
+              '<div onclick="openPublicModalById(\'' + item.idSppg + '\')" ' +
+              'style="padding:5px 6px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:6px;" ' +
+              'onmouseover="this.style.background=\'#f0f9ff\'" onmouseout="this.style.background=\'transparent\'">' +
+              '<div>' +
+              '<div style="font-weight:700;color:#0f172a;font-size:11px;">' + dot + ' Kel. ' + loc.kelurahan + '</div>' +
+              '<div style="font-size:9.5px;color:#64748b;">ID: ' + item.idSppg + ' &bull; ' + (item.totalPm || 0).toLocaleString('id-ID') + ' PM</div>' +
+              '</div>' +
+              '<span style="font-size:10px;color:#1d4ed8;font-weight:800;white-space:nowrap;">Profil &rarr;</span>' +
+              '</div>'
+            );
+          }).join('');
+
+          var stopSpan = (g.counts.SUSPEND + g.counts.KARHUTLA) > 0
+            ? ('<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">⏸️ Stop: ' + (g.counts.SUSPEND + g.counts.KARHUTLA) + '</span>')
+            : '';
+
+          var popupKec =
+            '<div style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:12px;line-height:1.4;min-width:240px;max-width:280px;">' +
+            '<div style="font-size:9.5px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:0.04em;">' + g.kabupaten + '</div>' +
+            '<div style="font-weight:800;color:#0a2558;font-size:14px;">Kecamatan ' + g.kecamatan + '</div>' +
+            '<div style="display:flex;gap:4px;flex-wrap:wrap;margin:6px 0;">' +
+            '<span style="background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">✅ Aktif: ' + g.counts.BEROPERASI + '</span>' +
+            '<span style="background:#f1f5f9;color:#475569;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">⏳ Persiapan: ' + g.counts.BELUM + '</span>' +
+            stopSpan +
+            '</div>' +
+            '<div style="font-size:11px;margin-bottom:6px;color:#334155;">' +
+            'Total Penerima Manfaat: <strong style="color:#0a2558;">' + g.totalPm.toLocaleString('id-ID') + ' PM</strong>' +
+            '</div>' +
+            '<div style="font-size:10px;font-weight:800;color:#475569;text-transform:uppercase;border-bottom:1px solid #cbd5e1;padding-bottom:3px;">' +
+            'Daftar Kelurahan &amp; Unit SPPG (' + g.items.length + '):' +
+            '</div>' +
+            '<div style="max-height:150px;overflow-y:auto;margin-bottom:6px;">' + listHtml + '</div>' +
+            '<button onclick="filterTableByKecamatan(\'' + g.kabupaten + '\', \'' + g.kecamatan + '\')" ' +
+            'style="width:100%;background:#0a2558;color:#fff;border:none;padding:5px 8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">' +
+            '📋 Filter Tabel ke Kec. ' + g.kecamatan + ' &rarr;' +
+            '</button>' +
+            '</div>';
+
+          marker.bindPopup(popupKec);
+          markersLayer.addLayer(marker);
+        });
+        return;
+      }
+
+      // MODE 3: PER UNIT SPPG & KELURAHAN
+      var kecCountTracker = {};
+      var gpsVerifiedCount = activeItems.filter(function (it) { return parseSppgLocation(it).hasGmapsLink; }).length;
+      if (counterEl) {
+        counterEl.innerHTML = '🏠 Menampilkan <b>' + activeItems.length + ' Titik Unit SPPG</b>' +
+          (gpsVerifiedCount > 0
+            ? (' (<span class="text-emerald-700 font-extrabold">🎯 ' + gpsVerifiedCount + ' Terhubung G-Maps</span>)')
+            : ' (Tingkat Kecamatan & Kelurahan)');
+      }
+
+      activeItems.forEach(function (item) {
+        var loc = parseSppgLocation(item);
+        var lat = loc.baseLat;
+        var lng = loc.baseLng;
+
+        if (!loc.hasExactGps) {
+          var key = loc.kabupaten + '|' + loc.kecamatan;
+          var idxInKec = kecCountTracker[key] || 0;
+          kecCountTracker[key] = idxInKec + 1;
+
+          if (idxInKec > 0) {
+            var angle = idxInKec * 2.3999632;
+            var radius = 0.0038 * Math.sqrt(idxInKec);
+            lat += radius * Math.cos(angle);
+            lng += radius * Math.sin(angle);
+          }
+        }
+
+        var cat = getSppgStatusCategory(item);
+        var fillColor = '#64748b';
+        var statusLabel = '⏳ Belum Beroperasi (Persiapan)';
+        if (cat === 'BEROPERASI') {
+          fillColor = '#10b981';
+          statusLabel = '✅ Beroperasi Aktif';
+        } else if (cat === 'KARHUTLA') {
+          fillColor = '#ea580c';
+          statusLabel = '🔥 Stop Operasional Karhutla';
+        } else if (cat === 'SUSPEND') {
+          fillColor = '#f59e0b';
+          statusLabel = '⏸️ Stop Sementara / Suspend';
+        }
+
+        var marker = L.circleMarker([lat, lng], {
+          radius: loc.hasGmapsLink ? 6.5 : 5.5,
+          fillColor: fillColor,
+          color: loc.hasGmapsLink ? '#0a2558' : '#ffffff',
+          weight: loc.hasGmapsLink ? 2.5 : 1.8,
+          fillOpacity: 0.95
+        });
+
+        var gmapsMarkerLink = loc.hasGmapsLink
+          ? ('<a href="' + loc.gmapsUrl + '" target="_blank" style="display:inline-block;margin-top:4px;padding:2px 6px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;border-radius:4px;font-size:9.5px;font-weight:700;text-decoration:none;">🗺️ Buka Google Maps &nearr;</a>')
+          : '';
+
+        var tipUnit =
+          '<div>' +
+          '<div style="font-weight:800;color:#fbbf24;">' + item.namaSppg + '</div>' +
+          '<div>Kec. <b>' + loc.kecamatan + '</b> &bull; Kel. <b>' + loc.kelurahan + '</b> (#' + loc.noAntrian + ')</div>' +
+          '</div>';
+
+        marker.bindTooltip(tipUnit, { direction: 'top', offset: [0, -6], className: 'leaflet-tooltip-own' });
+
+        var popupUnit =
+          '<div style="font-family:\'Plus Jakarta Sans\',sans-serif;font-size:12px;line-height:1.45;min-width:235px;">' +
+          '<div style="font-size:9.5px;font-weight:800;color:#1d4ed8;text-transform:uppercase;">' + loc.kabupaten + '</div>' +
+          '<strong style="color:#0a2558;font-size:13px;display:block;margin-bottom:4px;">' + item.namaSppg + '</strong>' +
+          '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px;margin-bottom:6px;font-size:11px;">' +
+          '<div>🏛️ <b>Kab/Kota:</b> ' + loc.kabupaten + '</div>' +
+          '<div>📍 <b>Kecamatan:</b> ' + loc.kecamatan + '</div>' +
+          '<div>🏡 <b>Kelurahan/Desa:</b> ' + loc.kelurahan + '</div>' +
+          '</div>' +
+          '<div style="font-size:11px;">' +
+          '<b>ID SPPG:</b> ' + item.idSppg + '<br/>' +
+          '<b>Status:</b> ' + statusLabel + '<br/>' +
+          '<b>Yayasan:</b> ' + item.yayasan + '<br/>' +
+          '<b>Total Penerima Manfaat:</b> <strong style="color:#0a2558;">' + (item.totalPm || 0).toLocaleString('id-ID') + ' PM</strong>' +
+          '</div>' +
+          gmapsMarkerLink +
+          '<button onclick="openPublicModalById(\'' + item.idSppg + '\')" ' +
+          'style="margin-top:6px;width:100%;background:#0a2558;color:#fff;border:none;padding:5px 8px;border-radius:6px;font-size:11px;font-weight:bold;cursor:pointer;">' +
+          '🔍 Lihat Profil Lengkap SPPG &rarr;' +
+          '</button>' +
+          '</div>';
+
+        marker.bindPopup(popupUnit);
+        markersLayer.addLayer(marker);
+      });
+    }
+
+    function renderChart() {
+      var canvasEl = document.getElementById('kabChart');
+      if (!canvasEl || !DB) return;
+      var ctx = canvasEl.getContext('2d');
+      if (kabChartInstance) kabChartInstance.destroy();
+
+      var labels = DB.kabList.map(function (k) {
+        return k.wilayah.replace('KOTA ', '').replace('KUTAI ', 'K. ');
+      });
+      var targets = DB.kabList.map(function (k) { return k.targetSppg; });
+      var realisasis = DB.kabList.map(function (k) {
+        var countFromItems = DB.sppgItems.filter(function (s) {
+          return s.kabupaten === k.wilayah && getSppgStatusCategory(s) !== 'BELUM';
+        }).length;
+        return countFromItems > 0 ? countFromItems : (k.sppgBeroperasi + (k.sppgStop || 0));
+      });
+
+      kabChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: 'Target SPPG', data: targets, backgroundColor: '#bfdbfe', borderRadius: 4 },
+            { label: 'Realisasi SPPG', data: realisasis, backgroundColor: '#1d4ed8', borderRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
+          scales: {
+            x: { ticks: { font: { size: 9 } } },
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    /**
+     * ========================================================================
+     * FILTER JENIS MITRA SPPG (KOLOM D SHEET KALTIM) & TABEL REKAP 10 KAB/KOTA
+     * ========================================================================
+     * Fungsi-fungsi di bawah ini mengatur dropdown checkbox Jenis Mitra SPPG
+     * (mengacu pada Kolom D di Sheet KALTIM) pada Tabel Rekapitulasi 10 Kab/Kota.
+     * Ketika Jenis Mitra dipilih/dicentang, HANYA kolom "Total SPPG" per Kab/Kota
+     * yang dihitung ulang, sedangkan kolom Potensi & PM tetap mengacu pada rekap resmi.
+     */
+    function getNormalizedMitraType(item) {
+      var raw = String((item && item.jenisSppg) || '').trim().replace(/\s+/g, ' ');
+      if (!raw || raw === '-') return 'Lainnya';
+      return raw;
+    }
+
+    function toggleRekapMitraDropdown(e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      var menu = document.getElementById('rekapMitraDropdownMenu');
+      if (menu) menu.classList.toggle('hidden');
+    }
+
+    function initRekapMitraDropdown() {
+      var listEl = document.getElementById('rekapMitraCheckboxList');
+      if (!listEl || !DB || !DB.sppgItems) return;
+
+      var countsMap = {};
+      var uniqueTypes = [];
+
+      DB.sppgItems.forEach(function (item) {
+        var mType = getNormalizedMitraType(item);
+        if (countsMap[mType] === undefined) {
+          countsMap[mType] = 0;
+          uniqueTypes.push(mType);
+        }
+        countsMap[mType]++;
+      });
+
+      // Urutkan jenis mitra dari jumlah terbanyak ke paling sedikit
+      uniqueTypes.sort(function (a, b) {
+        return countsMap[b] - countsMap[a];
+      });
+
+      var html = '';
+      for (var i = 0; i < uniqueTypes.length; i++) {
+        var tName = uniqueTypes[i];
+        var cnt = countsMap[tName] || 0;
+        html +=
+          '<label class="flex items-center justify-between gap-2 px-2.5 py-1.5 hover:bg-blue-50/70 rounded-lg cursor-pointer select-none transition">' +
+          '<div class="flex items-center gap-2 min-w-0">' +
+          '<input type="checkbox" value="' + tName.replace(/"/g, '&quot;') + '" data-label="' + tName.replace(/"/g, '&quot;') + '" checked ' +
+          'onchange="onRekapMitraCbChange()" ' +
+          'class="rekap-mitra-cb w-4 h-4 text-bgn-700 rounded focus:ring-bgn-600 cursor-pointer shrink-0">' +
+          '<span class="px-2.5 py-0.5 bg-blue-50 text-bgn-900 border border-blue-200 rounded-full text-[11px] font-bold truncate">' +
+          tName +
+          '</span>' +
+          '</div>' +
+          '<span class="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-extrabold shrink-0">' + cnt.toLocaleString('id-ID') + ' Unit</span>' +
+          '</label>';
+      }
+
+      if (!html) {
+        html = '<div class="p-3 text-center text-xs text-slate-400">Tidak ada data jenis mitra</div>';
+      }
+
+      listEl.innerHTML = html;
+      updateRekapMitraDropdownLabel();
+    }
+
+    function updateRekapMitraDropdownLabel() {
+      var btnLabel = document.getElementById('rekapMitraDropdownLabel');
+      if (!btnLabel) return;
+      var allCbs = document.querySelectorAll('.rekap-mitra-cb');
+      var checkedCbs = document.querySelectorAll('.rekap-mitra-cb:checked');
+      var total = allCbs.length;
+      var count = checkedCbs.length;
+
+      if (total === 0 || count === total) {
+        btnLabel.innerText = '☑️ Semua Jenis Mitra (' + total + ')';
+      } else if (count === 0) {
+        btnLabel.innerText = '⬜ Pilih Jenis Mitra (0)';
+      } else if (count === 1) {
+        btnLabel.innerText = '☑️ Mitra: ' + (checkedCbs[0].getAttribute('data-label') || '1 Jenis');
+      } else {
+        btnLabel.innerText = '☑️ ' + count + ' Jenis Mitra Dipilih';
+      }
+    }
+
+    function onRekapMitraCbChange() {
+      updateRekapMitraDropdownLabel();
+      renderRekapKabTable();
+    }
+
+    function setRekapMitraQuick(checkAll) {
+      document.querySelectorAll('.rekap-mitra-cb').forEach(function (cb) {
+        cb.checked = checkAll;
+      });
+      updateRekapMitraDropdownLabel();
+      renderRekapKabTable();
+    }
+
+    /**
+     * FUNGSI: renderRekapKabTable()
+     * ------------------------------------------------------------------------
+     * Menampilkan Tabel Rekapitulasi Capaian 10 Kabupaten/Kota di Halaman 1.
+     * - Kolom "Total SPPG": Dihitung dinamis per Kab/Kota sesuai filter
+     *   Jenis Mitra (Kolom D Sheet KALTIM) yang dicentang pada dropdown.
+     * - Kolom "Potensi Sasaran", "PM 3B", "PM Siswa", "Tendik & Non-Tendik",
+     *   dan "Total Penerima Manfaat": Mengacu tetap pada data resmi Sheet REKAPITULASI.
+     * - Kolom "Persentase PM" (di sebelah kanan): Dihitung dari
+     *   (Total Penerima Manfaat / Potensi Sasaran) * 100%.
+     */
+    function renderRekapKabTable() {
+      var tbody = document.getElementById('rekapKabTableBody');
+      if (!tbody || !DB) return;
+
+      var allMitraCbs = document.querySelectorAll('.rekap-mitra-cb');
+      var checkedMitraCbs = document.querySelectorAll('.rekap-mitra-cb:checked');
+      var checkedMitraValues = Array.from(checkedMitraCbs).map(function (cb) { return cb.value; });
+      var isAllMitraSelected = (allMitraCbs.length === 0) || (checkedMitraCbs.length === allMitraCbs.length);
+
+      var filterSubLabel = 'Semua Mitra';
+      if (!isAllMitraSelected) {
+        if (checkedMitraCbs.length === 0) {
+          filterSubLabel = '0 Dipilih';
+        } else if (checkedMitraCbs.length === 1) {
+          filterSubLabel = checkedMitraCbs[0].getAttribute('data-label') || '';
+        } else {
+          filterSubLabel = checkedMitraCbs.length + ' Jenis Mitra';
+        }
+      }
+
+      var totalFilteredSppgProv = 0;
+
+      tbody.innerHTML = DB.kabList.map(function (r, i) {
+        var isSel = (selectedKab === r.wilayah);
+        var rowCls = isSel ? 'bg-blue-100/80 font-bold' : 'hover:bg-blue-50/60';
+        var activeBadge = isSel ? '<span class="px-1.5 py-0.5 text-[9px] bg-bgn-800 text-white rounded">Aktif</span>' : '';
+
+        // 1. Hitung jumlah unit SPPG di Kabupaten/Kota ini sesuai filter Jenis Mitra (Kolom D)
+        var sppgMitraCount = 0;
+        if (allMitraCbs.length === 0) {
+          sppgMitraCount = DB.sppgItems.filter(function (it) { return it.kabupaten === r.wilayah; }).length;
+        } else {
+          sppgMitraCount = DB.sppgItems.filter(function (it) {
+            return it.kabupaten === r.wilayah && checkedMitraValues.indexOf(getNormalizedMitraType(it)) !== -1;
+          }).length;
+        }
+        totalFilteredSppgProv += sppgMitraCount;
+
+        var sppgPillCls = sppgMitraCount > 0 ? 'bg-blue-100 text-bgn-900 border border-blue-200' : 'bg-slate-100 text-slate-400';
+
+        // 2. Hitung Persentase Penerima Manfaat (PM) terhadap Potensi Sasaran
+        var pctPmVal = r.potTotal > 0 ? ((r.totalPm / r.potTotal) * 100) : 0;
+        var pctPm = Math.min(100, pctPmVal).toFixed(1);
+        var barColor = pctPmVal >= 50 ? 'bg-emerald-500' : (pctPmVal > 0 ? 'bg-sky-500' : 'bg-slate-300');
+        var pmPillCls = pctPmVal >= 50 ? 'bg-emerald-100 text-emerald-800' : (pctPmVal > 0 ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-500');
+
+        return (
+          '<tr onclick="selectKabupaten(\'' + r.wilayah + '\', true)" class="cursor-pointer transition ' + rowCls + '">' +
+          '<td class="p-3 text-slate-400">' + (i + 1) + '</td>' +
+          '<td class="p-3 font-bold text-bgn-900 flex items-center gap-1.5">' +
+          '<span>' + r.wilayah + '</span>' + activeBadge +
+          '</td>' +
+          '<td class="p-3 text-center">' +
+          '<div class="inline-flex flex-col items-center">' +
+          '<span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold ' + sppgPillCls + '">' + sppgMitraCount.toLocaleString('id-ID') + ' Unit</span>' +
+          '<span class="text-[9.5px] text-slate-500 font-semibold mt-0.5 max-w-[110px] truncate">' + filterSubLabel + '</span>' +
+          '</div>' +
+          '</td>' +
+          '<td class="p-3 text-right text-slate-600">' + (r.potTotal || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right font-semibold text-amber-600">' + (r.total3B || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right font-semibold text-indigo-700">' + (r.pmSiswa || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right font-semibold text-slate-700">' + ((r.pmTendik || 0) + (r.pmNonTendik || 0)).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right font-extrabold text-bgn-900">' + (r.totalPm || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-center">' +
+          '<div class="inline-flex flex-col items-center min-w-[76px]">' +
+          '<span class="px-2 py-0.5 rounded-full text-xs font-extrabold ' + pmPillCls + '">' + pctPm + '%</span>' +
+          '<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1">' +
+          '<div class="' + barColor + ' h-full rounded-full transition-all duration-500" style="width:' + pctPm + '%"></div>' +
+          '</div>' +
+          '</div>' +
+          '</td>' +
+          '<td class="p-3 text-center">' +
+          '<span class="px-2 py-1 bg-bgn-50 hover:bg-bgn-100 text-bgn-700 rounded border border-blue-200 text-[10px] font-bold transition">' +
+          'Pilih &rarr;' +
+          '</span>' +
+          '</td>' +
+          '</tr>'
+        );
+      }).join('');
+
+      var tfoot = document.getElementById('rekapKabTableFoot');
+      if (tfoot && DB.provTotal) {
+        var p = DB.provTotal;
+        var totPctPm = p.potTotal > 0 ? ((p.totalPm / p.potTotal) * 100).toFixed(1) : '0.0';
+        tfoot.innerHTML =
+          '<tr>' +
+          '<td class="p-3 text-center" colspan="2">TOTAL KALIMANTAN TIMUR</td>' +
+          '<td class="p-3 text-center text-bgn-900">' + totalFilteredSppgProv.toLocaleString('id-ID') + ' Unit</td>' +
+          '<td class="p-3 text-right">' + (p.potTotal || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right text-amber-700">' + (p.total3B || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right text-indigo-800">' + (p.pmSiswa || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right text-slate-800">' + ((p.pmTendik || 0) + (p.pmNonTendik || 0)).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right text-bgn-900">' + (p.totalPm || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-center text-emerald-800">' + totPctPm + '%</td>' +
+          '<td class="p-3"></td>' +
+          '</tr>';
+      }
+    }
+
+    /**
+     * FUNGSI: renderSppgTable()
+     * ------------------------------------------------------------------------
+     * Menampilkan Daftar & Kartu Direktori Unit SPPG berdasarkan filter aktif:
+     * 1. Wilayah Kabupaten/Kota yang dipilih (selectedKab)
+     * 2. Ceklis 16 Status Operasional (isItemStatusChecked)
+     * 3. Kata kunci pencarian di kotak cari (sppgSearchInput)
+     *
+     * Sumber data: DB.sppgItems (berasal dari fungsi parseSheetKaltimPublic di Kode.gs / Sheet "KALTIM").
+     * - PM 3B              : r.total3B (Kolom Y di Sheet KALTIM)
+     * - PM Siswa           : r.pmSiswa (Kolom Z di Sheet KALTIM)
+     * - Tendik & Non-Tendik: r.pmTendik + r.pmNonTendik (Kolom AA + AB di Sheet KALTIM)
+     * - Total Penerima     : r.totalPm (Kolom AC di Sheet KALTIM)
+     */
+    function renderSppgTable() {
+      if (!DB) return;
+
+      var searchEl = document.getElementById('sppgSearchInput');
+      var q = (searchEl ? searchEl.value : '').toLowerCase();
+
+      var filtered = DB.sppgItems.filter(function (item) {
+        var matchKab = (selectedKab === 'SEMUA') || (item.kabupaten === selectedKab);
+        var matchSt = isItemStatusChecked(item);
+        var loc = parseSppgLocation(item);
+
+        var blob = (
+          item.namaSppg + ' ' + item.idSppg + ' ' + item.yayasan + ' ' +
+          item.kabupaten + ' ' + loc.kecamatan + ' ' + loc.kelurahan + ' ' + item.status
+        ).toLowerCase();
+        var matchQ = !q || blob.indexOf(q) !== -1;
+
+        return matchKab && matchSt && matchQ;
+      });
+
+      currentFilteredSppg = filtered;
+
+      var cardsWrap = document.getElementById('sppgCardsContainer');
+      if (cardsWrap) {
+        if (filtered.length === 0) {
+          cardsWrap.innerHTML = '<div class="col-span-full p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">Tidak ada unit SPPG yang sesuai dengan filter pencarian.</div>';
+        } else {
+          cardsWrap.innerHTML = filtered.map(function (r, idx) {
+            var detSt = getItemDetailedStatusObj(r);
+            var loc = parseSppgLocation(r);
+            var gmapsBtn = loc.hasGmapsLink
+              ? ('<a href="' + loc.gmapsUrl + '" target="_blank" class="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[10px] font-bold inline-flex items-center gap-1"><span>🗺️</span><span>G-Maps &nearr;</span></a>')
+              : '';
+            return (
+              '<div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition flex flex-col justify-between space-y-3">' +
+              '<div>' +
+              '<div class="flex items-center justify-between gap-2">' +
+              '<span class="text-[10px] font-extrabold uppercase text-bgn-700">' + r.kabupaten + '</span>' +
+              '<span style="' + detSt.pillStyle + 'padding:2px 8px;border-radius:9999px;font-size:9.5px;font-weight:700;">' + r.status + '</span>' +
+              '</div>' +
+              '<h4 class="font-extrabold text-slate-900 text-sm mt-1.5 leading-snug">' + r.namaSppg + '</h4>' +
+              '<div class="text-[11px] text-slate-500 mt-0.5">Yayasan: <b>' + r.yayasan + '</b></div>' +
+              '<div class="mt-2.5 p-2 bg-slate-50 rounded-lg border border-slate-200/80 text-[11px] space-y-1">' +
+              '<div>📍 Kec. ' + loc.kecamatan + ' &bull; Kel. ' + loc.kelurahan + '</div>' +
+              '<div>👥 Total Penerima: <strong class="text-bgn-900">' + (r.totalPm || 0).toLocaleString('id-ID') + ' PM</strong></div>' +
+              '<div>🎓 Siswa: ' + (r.pmSiswa || 0).toLocaleString('id-ID') + ' | 👶 3B: ' + (r.total3B || 0).toLocaleString('id-ID') + '</div>' +
+              '</div>' +
+              '</div>' +
+              '<div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">' +
+              gmapsBtn +
+              '<button onclick="openPublicModal(' + idx + ')" class="ml-auto px-3 py-1.5 bg-bgn-800 hover:bg-bgn-900 text-white rounded-lg text-xs font-bold transition cursor-pointer">' +
+              '🔍 Profil Lengkap &rarr;' +
+              '</button>' +
+              '</div>' +
+              '</div>'
+            );
+          }).join('');
+        }
+      }
+
+      document.getElementById('sppgCountBadge').innerText = filtered.length + ' Unit SPPG';
+      document.getElementById('sppgSubheader').innerText = (selectedKab === 'SEMUA')
+        ? 'Menampilkan daftar SPPG di seluruh Provinsi Kalimantan Timur'
+        : ('Menampilkan daftar SPPG di wilayah ' + selectedKab);
+
+      var tbody = document.getElementById('sppgTableBody');
+      if (filtered.length === 0) {
+        tbody.innerHTML =
+          '<tr><td colspan="12" class="p-8 text-center text-slate-400">' +
+          'Tidak ada unit SPPG yang sesuai dengan filter ceklis / pencarian saat ini.' +
+          '</td></tr>';
+        return;
+      }
+
+      function certIcon(val) {
+        return String(val || '').toLowerCase().indexOf('sudah') !== -1 ? '✅' : '⏳';
+      }
+
+      tbody.innerHTML = filtered.map(function (r, idx) {
+        var detSt = getItemDetailedStatusObj(r);
+        var loc = parseSppgLocation(r);
+        var gmapsBtnHtml = loc.hasGmapsLink
+          ? ('<a href="' + loc.gmapsUrl + '" target="_blank" class="px-1.5 py-0.2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300 rounded text-[9px] font-extrabold transition">🗺️ Buka G-Maps &nearr;</a>')
+          : '';
+        var displayStatusText = (r.status && r.status !== '-') ? r.status : detSt.label;
+        var statusBadge =
+          '<span style="' + detSt.pillStyle + 'display:inline-block;padding:2.5px 10px;border-radius:9999px;font-size:10px;font-weight:700;white-space:nowrap;">' +
+          displayStatusText +
+          '</span>';
+
+        return (
+          '<tr class="hover:bg-blue-50/40 transition align-middle">' +
+          '<td class="p-3 text-slate-400 font-semibold">' + (idx + 1) + '</td>' +
+          '<td class="p-3 font-bold text-bgn-900">' + r.kabupaten + '</td>' +
+          '<td class="p-3">' +
+          '<div class="font-bold text-slate-900">' + r.namaSppg + '</div>' +
+          '<div class="text-[10px] text-bgn-700 font-semibold mt-0.5 flex items-center gap-1 flex-wrap">' +
+          '<span>📍 Kec. ' + loc.kecamatan + ' &bull; Kel. ' + loc.kelurahan + '</span>' +
+          gmapsBtnHtml +
+          '</div>' +
+          '</td>' +
+          '<td class="p-3 text-slate-700">' + r.yayasan + '</td>' +
+          '<td class="p-3 text-center">' + statusBadge + '</td>' +
+          '<td class="p-3 text-slate-700 font-medium">' + r.kepalaSppg + '</td>' +
+          '<td class="p-3 text-right font-medium text-amber-700">' + (r.total3B || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right font-medium text-indigo-700">' + (r.pmSiswa || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right font-medium text-slate-700">' + ((r.pmTendik || 0) + (r.pmNonTendik || 0)).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-right font-extrabold text-bgn-900">' + (r.totalPm || 0).toLocaleString('id-ID') + '</td>' +
+          '<td class="p-3 text-center whitespace-nowrap">' +
+          '<span title="BPJS: ' + r.bpjs + '" class="px-1 py-0.5 bg-slate-100 rounded border text-[10px]">BPJS:' + certIcon(r.bpjs) + '</span> ' +
+          '<span title="SLHS: ' + r.slhs + '" class="px-1 py-0.5 bg-slate-100 rounded border text-[10px]">SLHS:' + certIcon(r.slhs) + '</span> ' +
+          '<span title="Halal: ' + r.halal + '" class="px-1 py-0.5 bg-slate-100 rounded border text-[10px]">Halal:' + certIcon(r.halal) + '</span>' +
+          '</td>' +
+          '<td class="p-3 text-center">' +
+          '<button onclick="openPublicModal(' + idx + ')" class="px-2.5 py-1.5 bg-bgn-700 hover:bg-bgn-800 text-white rounded-lg text-[11px] font-bold transition cursor-pointer">' +
+          '🔍 Profil' +
+          '</button>' +
+          '</td>' +
+          '</tr>'
+        );
+      }).join('');
+    }
+
+    /**
+     * FUNGSI: openPublicModal(idx) & openPublicModalItem(r)
+     * ------------------------------------------------------------------------
+     * Membuka jendela popup (Modal) berisi rincian profil lengkap 1 unit SPPG
+     * (Identitas, Lokasi, Rincian Penerima Manfaat per kategori, & Sertifikasi).
+     */
+    function openPublicModal(idx) {
+      var r = currentFilteredSppg[idx];
+      if (!r) return;
+      openPublicModalItem(r);
+    }
+
+    function openPublicModalItem(r) {
+      if (!r) return;
+      var loc = parseSppgLocation(r);
+      var gmapsModalBtn = loc.hasGmapsLink
+        ? ('<div class="pt-1.5"><a href="' + loc.gmapsUrl + '" target="_blank" class="inline-flex items-center justify-center gap-1.5 w-full px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-extrabold shadow-2xs transition"><span>🗺️</span><span>Buka Lokasi SPPG di Google Maps &nearr;</span></a></div>')
+        : '';
+
+      document.getElementById('mdl-kab').innerText = r.kabupaten + ' \u2022 KEC. ' + loc.kecamatan.toUpperCase();
+      document.getElementById('mdl-nama').innerText = r.namaSppg;
+      document.getElementById('mdl-id').innerText =
+        'ID SPPG: ' + r.idSppg + ' | Kategori: ' + r.jenisSppg + ' | Tgl Operasional: ' + (r.tglOps || '-');
+
+      function formatSocmed(val, platform) {
+        if (!val || val === '-') return '<span class="text-slate-400">Belum tersedia</span>';
+        var clean = String(val).trim();
+        var href = clean.indexOf('http') === 0 ? clean : ('https://' + platform + '.com/' + clean.replace(/^@/, ''));
+        return '<a href="' + href + '" target="_blank" class="text-bgn-600 font-bold hover:underline">' + clean + ' &nearr;</a>';
+      }
+
+      document.getElementById('mdl-body').innerHTML =
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+        '<div class="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 space-y-1.5">' +
+        '<h4 class="font-extrabold text-bgn-900 uppercase text-[11px] border-b border-blue-200 pb-1">1. Identitas &amp; Lokasi Rinci SPPG</h4>' +
+        '<div><b>Status Layanan:</b> <span class="font-bold text-bgn-800">' + r.status + '</span></div>' +
+        '<div><b>Kecamatan:</b> ' + loc.kecamatan + '</div>' +
+        '<div><b>Kelurahan / Desa:</b> ' + loc.kelurahan + '</div>' +
+        '<div><b>Yayasan:</b> ' + r.yayasan + '</div>' +
+        '<div><b>Kepala SPPG:</b> ' + r.kepalaSppg + '</div>' +
+        '<div><b>Pengawas Gizi:</b> ' + r.ahliGizi + '</div>' +
+        '<div><b>Pengawas Keuangan:</b> ' + r.akuntan + '</div>' +
+        gmapsModalBtn +
+        '</div>' +
+        '<div class="p-3.5 bg-sky-50/60 rounded-xl border border-sky-100 space-y-1.5">' +
+        '<h4 class="font-extrabold text-bgn-900 uppercase text-[11px] border-b border-sky-200 pb-1">2. Jangkauan Penerima Manfaat</h4>' +
+        '<div class="grid grid-cols-2 gap-2 pt-1">' +
+        '<div class="bg-white p-2 rounded border"><b>Siswa Sekolah:</b> ' + (r.pmSiswa || 0).toLocaleString('id-ID') + '</div>' +
+        '<div class="bg-white p-2 rounded border"><b>Balita:</b> ' + (r.pmBalita || 0).toLocaleString('id-ID') + '</div>' +
+        '<div class="bg-white p-2 rounded border"><b>Ibu Hamil:</b> ' + (r.pmBumil || 0).toLocaleString('id-ID') + '</div>' +
+        '<div class="bg-white p-2 rounded border"><b>Ibu Menyusui:</b> ' + (r.pmBusui || 0).toLocaleString('id-ID') + '</div>' +
+        '<div class="bg-white p-2 rounded border"><b>Tenaga Pendidik:</b> ' + (r.pmTendik || 0).toLocaleString('id-ID') + '</div>' +
+        '<div class="bg-white p-2 rounded border"><b>Non-Pendidik:</b> ' + (r.pmNonTendik || 0).toLocaleString('id-ID') + '</div>' +
+        '</div>' +
+        '<div class="pt-2 text-sm font-extrabold text-bgn-900">' +
+        'Total Penerima: ' + (r.totalPm || 0).toLocaleString('id-ID') + ' PM' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">' +
+        '<h4 class="font-extrabold text-bgn-900 uppercase text-[11px] border-b border-slate-200 pb-1">3. Standar Mutu, Sertifikasi &amp; Media Sosial</h4>' +
+        '<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">' +
+        '<div><b>Sertifikat Laik Higiene (SLHS):</b> ' + r.slhs + '</div>' +
+        '<div><b>Sertifikasi Halal:</b> ' + r.halal + '</div>' +
+        '<div><b>Sertifikasi Chef:</b> ' + r.chef + '</div>' +
+        '<div><b>BPJS Ketenagakerjaan:</b> ' + r.bpjs + '</div>' +
+        '<div><b>Instagram Resmi:</b> ' + formatSocmed(r.ig, 'instagram') + '</div>' +
+        '</div>' +
+        '<div class="text-[10px] text-slate-400 pt-2 border-t border-slate-200">' +
+        '* Demi pelindungan data pribadi (UU PDP), nomor kontak langsung personel dan dokumen internal tidak ditampilkan pada portal publik.' +
+        '</div>' +
+        '</div>';
+
+      document.getElementById('detailModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('detailModal').classList.add('hidden');
+    }
+
+    // =========================================================================
+    // FITUR CALL CENTER WHATSAPP (FLOATING WIDGET)
+    // =========================================================================
+    var CALL_CENTER_WA_NUMBER = '6281234567890';
+
+    function toggleCallCenterPopup() {
+      var popup = document.getElementById('callCenterPopup');
+      if (!popup) return;
+      popup.classList.toggle('hidden');
+    }
+
+    function sendCallCenterTopic(topicId) {
+      var msg = 'Halo Call Center BGN Kaltim, ';
+      if (topicId === 1) {
+        msg += 'saya ingin menanyakan informasi umum terkait pelaksanaan Program Makan Bergizi Gratis (MBG) di Kalimantan Timur.';
+      } else if (topicId === 2) {
+        msg += 'saya ingin berkonsultasi mengenai informasi Kemitraan Yayasan / Operasional Dapur SPPG.';
+      } else {
+        msg += 'saya ingin menyampaikan laporan / masukan terkait layanan distribusi MBG di wilayah kami.';
+      }
+      sendCallCenterWA(msg);
+    }
+
+    function sendCallCenterWA(messageText) {
+      var cleanPhone = String(CALL_CENTER_WA_NUMBER || '').replace(/[^0-9]/g, '');
+      var defaultMsg = 'Halo Call Center BGN Provinsi Kalimantan Timur, saya ingin bertanya terkait Program MBG.';
+      var text = encodeURIComponent(messageText || defaultMsg);
+      var waUrl = 'https://wa.me/' + cleanPhone + '?text=' + text;
+      window.open(waUrl, '_blank');
+    }
+
+    function sendCustomCallCenterWA() {
+      var inputEl = document.getElementById('ccCustomMessage');
+      var customVal = inputEl ? inputEl.value.trim() : '';
+      var msg = customVal
+        ? ('Halo Call Center BGN Kaltim, ' + customVal)
+        : 'Halo Call Center BGN Provinsi Kalimantan Timur, saya ingin menanyakan informasi terkait Program Makan Bergizi Gratis (MBG).';
+      sendCallCenterWA(msg);
+    }
+  </script>
+</body>
+
+</html>	
