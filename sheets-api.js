@@ -78,55 +78,73 @@ function maskNamePublic(fullName) {
 }
 
 /**
- * Mengambil tabel Google Sheet via GViz JSON API
+ * Mengambil tabel Google Sheet via GViz JSONP (Anti-Cache & Bebas Blokir Browser)
  */
-async function fetchSheetRowsGViz(spreadsheetId, sheetName) {
-  var url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/gviz/tq?tqx=out:json&sheet=' + encodeURIComponent(sheetName);
-  var res = await fetch(url);
-  if (!res.ok) {
-    if (res.status === 404) {
-      throw new Error('Spreadsheet tidak ditemukan atau belum diset publik (Share -> Anyone with the link can view).');
-    }
-    throw new Error('Gagal mengakses sheet ' + sheetName + ' (HTTP ' + res.status + ')');
-  }
+function fetchSheetRowsGViz(spreadsheetId, sheetName) {
+  return new Promise(function (resolve, reject) {
+    var callbackName = 'gviz_cb_' + Math.floor(Math.random() * 100000000);
+    var script = null;
+    var timeout = setTimeout(function () {
+      cleanup();
+      reject(new Error('Koneksi ke Google Sheet timeout (terlalu lama).'));
+    }, 15000);
 
-  var txt = await res.text();
-  var startIdx = txt.indexOf('{');
-  var endIdx = txt.lastIndexOf('}');
-  if (startIdx === -1 || endIdx === -1) {
-    throw new Error('Respon dari Google Sheets tidak valid.');
-  }
-
-  var rawJson = JSON.parse(txt.substring(startIdx, endIdx + 1));
-  if (rawJson.status !== 'ok') {
-    var errMsg = (rawJson.errors && rawJson.errors[0]) ? rawJson.errors[0].message : 'Format sheet tidak valid.';
-    throw new Error('Error Google Sheets: ' + errMsg);
-  }
-
-  var table = rawJson.table;
-  var colCount = table.cols.length;
-  var rows = [];
-
-  for (var r = 0; r < table.rows.length; r++) {
-    var rowObj = table.rows[r];
-    var rowArr = [];
-    for (var c = 0; c < colCount; c++) {
-      var cell = rowObj.c ? rowObj.c[c] : null;
-      if (!cell || cell.v === null || cell.v === undefined) {
-        rowArr.push('');
-      } else {
-        // Jika ada format tanggal atau angka terformat (f), gunakan f jika tipe date
-        if (typeof cell.v === 'string' && cell.v.indexOf('Date(') === 0) {
-          rowArr.push(cell.f || cell.v);
-        } else {
-          rowArr.push(cell.f !== undefined && cell.f !== null ? cell.f : cell.v);
-        }
+    function cleanup() {
+      clearTimeout(timeout);
+      try { delete window[callbackName]; } catch (e) { window[callbackName] = undefined; }
+      if (script && script.parentNode) {
+        script.parentNode.removeChild(script);
       }
     }
-    rows.push(rowArr);
-  }
 
-  return rows;
+    window[callbackName] = function (rawJson) {
+      cleanup();
+      if (!rawJson || rawJson.status !== 'ok') {
+        var errMsg = (rawJson && rawJson.errors && rawJson.errors[0])
+          ? rawJson.errors[0].message
+          : 'Data sheet tidak valid atau tab tidak ditemukan.';
+        reject(new Error('Error Google Sheets: ' + errMsg));
+        return;
+      }
+
+      var table = rawJson.table;
+      var colCount = table.cols.length;
+      var rows = [];
+
+      for (var r = 0; r < table.rows.length; r++) {
+        var rowObj = table.rows[r];
+        var rowArr = [];
+        for (var c = 0; c < colCount; c++) {
+          var cell = rowObj.c ? rowObj.c[c] : null;
+          if (!cell || cell.v === null || cell.v === undefined) {
+            rowArr.push('');
+          } else {
+            if (typeof cell.v === 'string' && cell.v.indexOf('Date(') === 0) {
+              rowArr.push(cell.f || cell.v);
+            } else {
+              rowArr.push(cell.f !== undefined && cell.f !== null ? cell.f : cell.v);
+            }
+          }
+        }
+        rows.push(rowArr);
+      }
+
+      resolve(rows);
+    };
+
+    script = document.createElement('script');
+    script.src = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
+      '/gviz/tq?tqx=responseHandler:' + callbackName +
+      '&sheet=' + encodeURIComponent(sheetName) +
+      '&_nc=' + Date.now();
+
+    script.onerror = function () {
+      cleanup();
+      reject(new Error('Spreadsheet tidak ditemukan atau belum diset publik (Share -> Anyone with the link can view).'));
+    };
+
+    document.head.appendChild(script);
+  });
 }
 
 /**
