@@ -4,7 +4,7 @@
  * DASHBOARD PUBLIK MONITORING MBG - PROVINSI KALIMANTAN TIMUR
  * Badan Gizi Nasional (BGN)
  * ============================================================================
- * Modul ini membaca langsung dari Google Spreadsheet menggunakan Google GViz API.
+ * Modul ini membaca langsung dari Google Spreadsheet menggunakan   Google GViz API.
  * Syarat: Google Spreadsheet harus disetel "Anyone with the link can view"
  * (Siapa saja yang memiliki link dapat melihat).
  */
